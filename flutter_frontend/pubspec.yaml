@@ -1,0 +1,45 @@
+name: pdf_highlighter
+description: "Professional PDF Batch Highlighter Application"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Core dependencies
+  cupertino_icons: ^1.0.8
+  provider: ^6.0.5
+
+  # Network & API
+  http: ^1.1.0
+  dio: ^5.4.0
+
+  # File handling
+  file_picker: ^10.3.3
+  path_provider: ^2.1.1
+  path: ^1.8.3
+  file_selector: ^1.0.4
+
+  # UI & Utilities
+  url_launcher: ^6.1.14
+  intl: ^0.20.2
+  shared_preferences: ^2.2.2
+
+  # Image & Media (for future enhancements)
+  image_picker: ^1.0.4
+  flutter_dotenv: ^6.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env

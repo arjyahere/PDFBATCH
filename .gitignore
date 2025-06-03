@@ -26,7 +26,18 @@ dist/
 *.egg-info/
 .eggs/
 
-# Secrets (python-dotenv is a dependency)
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+.symlinks/
+*.iml
+app.*.symbols
+app.*.map.json
+
+# Secrets (python-dotenv / flutter_dotenv)
 .env
 .env.*
 
@@ -35,6 +46,11 @@ dist/
 # config.py auto-creates output/ for highlighted PDFs
 temp_data_*
 output/
+logs/
+
+# Input documents (public repo - keep bank statements / payroll sheets out)
+*.pdf
+*.xlsx
 
 # IDE / editor
 .idea/
