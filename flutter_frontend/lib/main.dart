@@ -8,15 +8,27 @@ import 'screens/configuration_screen.dart';
 import 'screens/progress_screen.dart';
 import 'screens/logs_screen.dart';
 
+/// Application entry point
+/// 
+/// Initializes the Flutter binding, loads environment configuration,
+/// and launches the Batch Highlighter application.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔥 Load your .env file BEFORE anything else
-  await dotenv.load(fileName: ".env");
+  // Load .env file with error handling
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('Warning: Could not load .env file: $e');
+  }
 
   runApp(const BatchHighlighterApp());
 }
 
+/// Root widget of the Batch Highlighter application
+/// 
+/// Provides the app theme configuration, routing, and state management
+/// through Provider pattern.
 class BatchHighlighterApp extends StatelessWidget {
   const BatchHighlighterApp({super.key});
 
@@ -27,56 +39,8 @@ class BatchHighlighterApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Batch Highlighter',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.light,
-          ),
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 2,
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-          cardTheme: CardThemeData(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-        darkTheme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.dark,
-          ),
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 2,
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-          cardTheme: CardThemeData(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
+        theme: _buildLightTheme(),
+        darkTheme: _buildDarkTheme(),
         themeMode: ThemeMode.system,
         home: const HomePage(),
         routes: {
@@ -85,8 +49,70 @@ class BatchHighlighterApp extends StatelessWidget {
       ),
     );
   }
+
+  /// Builds the light theme configuration
+  ThemeData _buildLightTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.blue,
+        brightness: Brightness.light,
+      ),
+      appBarTheme: const AppBarTheme(
+        centerTitle: true,
+        elevation: 2,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
+  /// Builds the dark theme configuration
+  ThemeData _buildDarkTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.blue,
+        brightness: Brightness.dark,
+      ),
+      appBarTheme: const AppBarTheme(
+        centerTitle: true,
+        elevation: 2,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
 }
 
+/// Main home page with step-based navigation
+/// 
+/// Supports both desktop (tab-based) and mobile (stepper-based) layouts.
+/// Manages the three-step workflow: File Selection, Configuration, and Processing.
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -97,6 +123,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentStep = 0;
 
+  /// List of screen widgets for each step
   final List<Widget> _screens = const [
     FileSelectionScreen(),
     ConfigurationScreen(),
@@ -124,103 +151,116 @@ class _HomePageState extends State<HomePage> {
       body: Consumer<HighlighterProvider>(
         builder: (context, provider, child) {
           if (isDesktop) {
-            // Desktop layout with tabs - allow free navigation
-            return Column(
-              children: [
-                Container(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: Row(
-                    children: [
-                      _buildStepTab(0, 'Select Files', provider),
-                      _buildStepTab(1, 'Configure', provider),
-                      _buildStepTab(2, 'Process & Download', provider),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: _getCurrentScreen(),
-                  ),
-                ),
-              ],
-            );
+            return _buildDesktopLayout(provider);
           } else {
-            // Mobile layout with Stepper - allow free navigation
-            return Stepper(
-              currentStep: _currentStep,
-              onStepTapped: (step) {
-                // Allow navigation to any step
-                setState(() => _currentStep = step);
-              },
-              onStepContinue: () {
-                if (_currentStep < _screens.length - 1) {
-                  setState(() => _currentStep++);
-                }
-              },
-              onStepCancel: () {
-                if (_currentStep > 0) {
-                  setState(() => _currentStep--);
-                }
-              },
-              steps: [
-                Step(
-                  title: const Text('Select Files'),
-                  subtitle: const Text('Choose data file and documents'),
-                  content: const FileSelectionScreen(),
-                  isActive: _currentStep >= 0,
-                  state: _currentStep > 0
-                      ? StepState.complete
-                      : (_currentStep == 0 ? StepState.editing : StepState.indexed),
-                ),
-                Step(
-                  title: const Text('Configure'),
-                  subtitle: const Text('Select color and column'),
-                  content: const ConfigurationScreen(),
-                  isActive: _currentStep >= 1,
-                  state: _currentStep > 1
-                      ? StepState.complete
-                      : (_currentStep == 1
-                          ? StepState.editing
-                          : StepState.indexed),
-                ),
-                Step(
-                  title: const Text('Process & Download'),
-                  subtitle: const Text('Start processing and download results'),
-                  content: const ProgressScreen(),
-                  isActive: _currentStep >= 2,
-                  state: _currentStep == 2
-                      ? StepState.editing
-                      : StepState.indexed,
-                ),
-              ],
-              controlsBuilder: (context, details) {
-                return Row(
-                  children: [
-                    if (_currentStep > 0)
-                      TextButton(
-                        onPressed: details.onStepCancel,
-                        child: const Text('Back'),
-                      ),
-                    const SizedBox(width: 8),
-                    if (_currentStep < _screens.length - 1)
-                      ElevatedButton(
-                        onPressed: details.onStepContinue,
-                        child: const Text('Next'),
-                      ),
-                  ],
-                );
-              },
-            );
+            return _buildMobileLayout();
           }
         },
       ),
     );
   }
 
+  /// Builds the desktop layout with tab-based navigation
+  Widget _buildDesktopLayout(HighlighterProvider provider) {
+    return Column(
+      children: [
+        ColoredBox(
+          color: Theme.of(context).colorScheme.surface,
+          child: Row(
+            children: [
+              _buildStepTab(0, 'Select Files', provider),
+              _buildStepTab(1, 'Configure', provider),
+              _buildStepTab(2, 'Process & Download', provider),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: _getCurrentScreen(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Builds the mobile layout with Stepper navigation
+  Widget _buildMobileLayout() {
+    return Stepper(
+      currentStep: _currentStep,
+      onStepTapped: (step) {
+        setState(() => _currentStep = step);
+      },
+      onStepContinue: () {
+        if (_currentStep < _screens.length - 1) {
+          setState(() => _currentStep++);
+        }
+      },
+      onStepCancel: () {
+        if (_currentStep > 0) {
+          setState(() => _currentStep--);
+        }
+      },
+      steps: [
+        Step(
+          title: const Text('Select Files'),
+          subtitle: const Text('Choose data file and documents'),
+          content: const FileSelectionScreen(),
+          isActive: _currentStep >= 0,
+          state: _currentStep > 0
+              ? StepState.complete
+              : (_currentStep == 0 ? StepState.editing : StepState.indexed),
+        ),
+        Step(
+          title: const Text('Configure'),
+          subtitle: const Text('Select color and columns'),
+          content: const ConfigurationScreen(),
+          isActive: _currentStep >= 1,
+          state: _currentStep > 1
+              ? StepState.complete
+              : (_currentStep == 1
+                  ? StepState.editing
+                  : StepState.indexed),
+        ),
+        Step(
+          title: const Text('Process & Download'),
+          subtitle: const Text('Start processing and download results'),
+          content: const ProgressScreen(),
+          isActive: _currentStep >= 2,
+          state: _currentStep == 2
+              ? StepState.editing
+              : StepState.indexed,
+        ),
+      ],
+      controlsBuilder: (context, details) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 16.0),
+          child: Row(
+            children: [
+              if (_currentStep > 0)
+                TextButton(
+                  onPressed: details.onStepCancel,
+                  child: const Text('Back'),
+                ),
+              const SizedBox(width: 8),
+              if (_currentStep < _screens.length - 1)
+                ElevatedButton(
+                  onPressed: details.onStepContinue,
+                  child: const Text('Next'),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Builds a tab for desktop navigation
   Widget _buildStepTab(int stepIndex, String title, HighlighterProvider provider) {
     final isActive = _currentStep == stepIndex;
     final isCompleted = _isStepCompleted(stepIndex, provider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Expanded(
       child: InkWell(
@@ -230,7 +270,7 @@ class _HomePageState extends State<HomePage> {
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: isActive ? Theme.of(context).colorScheme.primary : Colors.transparent,
+                color: isActive ? colorScheme.primary : Colors.transparent,
                 width: 3,
               ),
             ),
@@ -239,16 +279,16 @@ class _HomePageState extends State<HomePage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (isCompleted)
-                const Icon(Icons.check_circle, size: 20, color: Colors.green)
+                Icon(Icons.check_circle, size: 20, color: colorScheme.primary)
               else
                 CircleAvatar(
                   radius: 10,
                   backgroundColor: isActive
-                      ? Theme.of(context).colorScheme.primary
+                      ? colorScheme.primary
                       : Colors.grey,
                   child: Text(
                     '${stepIndex + 1}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -260,6 +300,7 @@ class _HomePageState extends State<HomePage> {
                 title,
                 style: TextStyle(
                   fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                  color: isActive ? colorScheme.primary : null,
                 ),
               ),
             ],
@@ -269,12 +310,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Checks if a specific step is completed based on provider state
   bool _isStepCompleted(int stepIndex, HighlighterProvider provider) {
     switch (stepIndex) {
       case 0:
-        return provider.dataFile != null && provider.documentFiles.isNotEmpty && provider.columns.isNotEmpty;
+        return provider.dataFile != null &&
+            provider.documentFiles.isNotEmpty &&
+            provider.columns.isNotEmpty;
       case 1:
-        return provider.selectedColumn != null;
+        return provider.selectedColumns.isNotEmpty;
       case 2:
         return provider.progress >= 100;
       default:
@@ -282,6 +326,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// Returns the current screen widget based on the active step
   Widget _getCurrentScreen() {
     switch (_currentStep) {
       case 0:
@@ -304,5 +349,14 @@ class _HomePageState extends State<HomePage> {
         );
     }
   }
+}
 
+/// Extension to add safe navigation methods to BuildContext
+extension SafeNavigation on BuildContext {
+  /// Safely navigate only if the context is still mounted
+  void safeNavigate(VoidCallback navigation) {
+    if (mounted) {
+      navigation();
+    }
+  }
 }

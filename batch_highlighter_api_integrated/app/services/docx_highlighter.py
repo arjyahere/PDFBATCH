@@ -12,8 +12,11 @@ UAN_LENGTH = 12
 ESI_LENGTH = 10
 VALID_LENGTHS = (UAN_LENGTH, ESI_LENGTH)
 
-def docx_highlight_file(path, values, col_name, word_color_enum, original_filename, idx):
-    logger.info(f"Starting DOCX highlighting for {os.path.basename(path)}, column {col_name}, values count: {len(values_norm)}")
+def docx_highlight_file(path, data, col_names, word_color_enum, original_filename, idx):
+    columns = [col.strip() for col in col_names.split(',')]
+    is_single = len(columns) == 1
+    data_count = len(data)
+    logger.info(f"Starting DOCX highlighting for {os.path.basename(path)}, columns {columns}, data count: {data_count}, mode: {'single' if is_single else 'pairs'}")
     matches = 0
     logs_local = []
     start = now_ts()
@@ -22,51 +25,100 @@ def docx_highlight_file(path, values, col_name, word_color_enum, original_filena
         logger.info(f"DOCX opened successfully: {len(doc.paragraphs)} paragraphs")
     except Exception as e:
         logger.error(f"Failed to open DOCX {path}: {e}")
-        logs_local.append({"File": os.path.basename(path), "Page/Paragraph": "", "Column": col_name,
-                           "Matched Value": "", "Timestamp": start, "Output File": "",
+        logs_local.append({"File": os.path.basename(path), "Page/Paragraph": "", "Columns": col_names,
+                           "Matched Pair": "", "Timestamp": start, "Output File": "",
                            "Note": f"Failed to open DOCX: {e}"})
         return 0, logs_local, None
 
-    # Normalize input values based on column type
-    is_account_col = col_name and "a/c" in col_name.lower()
-    values_norm = set()
-    if is_account_col:
-        # For account numbers, keep full strings
-        values_norm = set(values)
-    else:
-        # For UAN/ESI, normalize to digits and filter length
-        for v in values:
-            d = re.sub(r"\D", "", str(v or ""))
-            if len(d) in VALID_LENGTHS:
-                values_norm.add(d)
+    def normalize_value(val, is_account):
+        if is_account:
+            return str(val).strip()
+        else:
+            s = str(val).strip()
+            if '.' in s:
+                s = s.rstrip('0').rstrip('.')
+            return s
 
+    if is_single:
+        col_name = columns[0]
+        is_account_col = col_name and "a/c" in col_name.lower()
+        values_norm = set()
+        if is_account_col:
+            values_norm = set(data)
+        else:
+            for v in data:
+                d = re.sub(r"\D", "", str(v or ""))
+                if len(d) in VALID_LENGTHS:
+                    values_norm.add(d)
+                else:
+                    values_norm.add(normalize_value(v, False))
+    else:
+        pairs_norm = set()
+        for p1, p2 in data:
+            n1 = normalize_value(p1, "a/c" in columns[0].lower())
+            n2 = normalize_value(p2, "a/c" in columns[1].lower())
+            pairs_norm.add((n1, n2))
+
+    detected_values = set()
     for pidx, para in enumerate(doc.paragraphs, start=1):
         if not processing_state["running"]:
             break
         text = para.text or ""
         if not text.strip():
             continue
-        for val in values_norm:
-            flags = re.IGNORECASE if re.search(r"[A-Za-z]", val) else 0
-            pattern = r"\b" + re.escape(val) + r"\b"
-            if re.search(pattern, text, flags):
-                try:
-                    for run in para.runs:
-                        highlight_xml = parse_xml(
-                            rf'<w:highlight xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="{COLOR_PRESETS[processing_state.get("selected_color", "Yellow")]["word_val"]}"/>')
-                        rPr = run._element.get_or_add_rPr()
-                        rPr.append(highlight_xml)
-                    matches += 1
-                    logs_local.append({"File": os.path.basename(path),
-                                       "Page/Paragraph": f"Para {pidx}: {text[:80]}",
-                                       "Column": col_name, "Matched Value": val,
-                                       "Timestamp": start, "Output File": "",
-                                       "Note": "Exact match (DOCX paragraph)"})
-                except Exception as e:
-                    logs_local.append({"File": os.path.basename(path),
-                                       "Page/Paragraph": f"Para {pidx}", "Column": col_name,
-                                       "Matched Value": val, "Timestamp": start,
-                                       "Output File": "", "Note": f"Highlight error: {e}"})
+        if is_single:
+            for val in values_norm:
+                flags = re.IGNORECASE if re.search(r"[A-Za-z]", val) else 0
+                pattern = r"\b" + re.escape(val) + r"\b"
+                if re.search(pattern, text, flags):
+                    if val in detected_values:
+                        continue
+                    detected_values.add(val)
+                    try:
+                        for run in para.runs:
+                            highlight_xml = parse_xml(
+                                rf'<w:highlight xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="{COLOR_PRESETS[processing_state.get("selected_color", "Yellow")]["word_val"]}"/>')
+                            rPr = run._element.get_or_add_rPr()
+                            rPr.append(highlight_xml)
+                        matches += 1
+                        logs_local.append({"File": os.path.basename(path),
+                                           "Page/Paragraph": f"Para {pidx}: {text[:80]}",
+                                           "Columns": col_names, "Matched Value": val,
+                                           "Timestamp": start, "Output File": "",
+                                           "Note": "Exact match (DOCX paragraph)"})
+                    except Exception as e:
+                        logs_local.append({"File": os.path.basename(path),
+                                           "Page/Paragraph": f"Para {pidx}", "Columns": col_names,
+                                           "Matched Value": val, "Timestamp": start,
+                                           "Output File": "", "Note": f"Highlight error: {e}"})
+        else:
+            # For pairs, normalize the text? But since it's paragraphs, perhaps search for normalized versions
+            text_norm = normalize_value(text, False)  # But text is long, perhaps not
+            # For simplicity, search for the normalized values in the normalized text
+            text_normalized = re.sub(r"[^\w\s.]", "", text).strip()  # Remove special chars except dot
+            for p in pairs_norm:
+                v1, v2 = p
+                if v1 in text_normalized and v2 in text_normalized:
+                    if p in detected_values:
+                        continue
+                    detected_values.add(p)
+                    try:
+                        for run in para.runs:
+                            highlight_xml = parse_xml(
+                                rf'<w:highlight xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="{COLOR_PRESETS[processing_state.get("selected_color", "Yellow")]["word_val"]}"/>')
+                            rPr = run._element.get_or_add_rPr()
+                            rPr.append(highlight_xml)
+                        matches += 1
+                        logs_local.append({"File": os.path.basename(path),
+                                           "Page/Paragraph": f"Para {pidx}: {text[:80]}",
+                                           "Columns": col_names, "Matched Pair": f"{v1},{v2}",
+                                           "Timestamp": start, "Output File": "",
+                                           "Note": "Exact match (DOCX paragraph)"})
+                    except Exception as e:
+                        logs_local.append({"File": os.path.basename(path),
+                                           "Page/Paragraph": f"Para {pidx}", "Columns": col_names,
+                                           "Matched Pair": f"{v1},{v2}", "Timestamp": start,
+                                           "Output File": "", "Note": f"Highlight error: {e}"})
         while processing_state["paused"] and processing_state["running"]:
             time.sleep(0.2)
 
@@ -79,7 +131,7 @@ def docx_highlight_file(path, values, col_name, word_color_enum, original_filena
         doc.save(out_path)
     except Exception as e:
         logs_local.append({"File": os.path.basename(path), "Page/Paragraph": "",
-                           "Column": col_name, "Matched Value": "",
+                           "Columns": col_names, "Matched Pair": "",
                            "Timestamp": start, "Output File": "",
                            "Note": f"Failed to save DOCX: {e}"})
         return matches, logs_local, None

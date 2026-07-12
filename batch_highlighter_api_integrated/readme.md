@@ -118,7 +118,7 @@ flutter build web
 flutter run -d web-server --web-port=8080 --web-hostname=0.0.0.0 
 or
 
-cd flutter_frontend\build\web
+cd build\web
 python -m http.server 8080
 
 

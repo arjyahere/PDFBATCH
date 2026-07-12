@@ -11,11 +11,11 @@ router = APIRouter(tags=["Process"])
 async def process_files(background_tasks: BackgroundTasks,
                         data_file: UploadFile = File(...),
                         documents: List[UploadFile] = File(...),
-                        selected_column: str = Form(...),
+                        selected_columns: str = Form(...),
                         selected_color: str = Form(...),
                         destination_folder: Optional[str] = Form(None)):
     try:
-        logger.info(f"Processing request with column: {selected_column}, color: {selected_color}, dest: {destination_folder}")
+        logger.info(f"Processing request with columns: {selected_columns}, color: {selected_color}, dest: {destination_folder}")
         logger.info(f"Data file: {data_file.filename}, Documents: {[d.filename for d in documents]}")
 
         data_temp = f"temp_data_{data_file.filename}"
@@ -68,17 +68,37 @@ async def process_files(background_tasks: BackgroundTasks,
             error_info = format_error(code="DATA_INVALID", details=str(e))
             raise HTTPException(status_code=400, detail=error_info)
 
-        if selected_column not in df.columns:
-            logger.error(f"Column '{selected_column}' not found in data")
-            error_info = format_error(code="VALIDATION_MISSING_FIELD", message=f"Column '{selected_column}' not found in data")
+        columns = [col.strip() for col in selected_columns.split(',') if col.strip()]
+        if len(columns) < 1 or len(columns) > 2:
+            logger.error(f"1 or 2 columns must be selected, got: {columns}")
+            error_info = format_error(code="VALIDATION_MISSING_FIELD", message="1 or 2 columns must be selected")
             raise HTTPException(status_code=400, detail=error_info)
 
-        values = [v.strip() for v in df[selected_column].astype(str).tolist() if v and v.lower() != "nan"]
-        logger.info(f"Extracted {len(values)} values from column {selected_column}")
+        for col in columns:
+            if col not in df.columns:
+                logger.error(f"Column '{col}' not found in data")
+                error_info = format_error(code="VALIDATION_MISSING_FIELD", message=f"Column '{col}' not found in data")
+                raise HTTPException(status_code=400, detail=error_info)
 
-        background_tasks.add_task(worker_process, values, doc_temp_paths, destination_folder, selected_column, selected_color)
-        logger.info("Background task added for processing")
-        return {"message": "Processing started", "total_values": len(values), "total_files": len(doc_temp_paths)}
+        if len(columns) == 1:
+            # Single column mode
+            values = [v.strip() for v in df[columns[0]].astype(str).tolist() if v and v.lower() != "nan"]
+            logger.info(f"Extracted {len(values)} values from column {columns[0]}")
+            background_tasks.add_task(worker_process, values, doc_temp_paths, destination_folder, selected_columns, selected_color)
+            logger.info("Background task added for processing")
+            return {"message": "Processing started", "total_values": len(values), "total_files": len(doc_temp_paths)}
+        else:
+            # Two column mode
+            pairs = []
+            for _, row in df.iterrows():
+                val1 = str(row[columns[0]]).strip()
+                val2 = str(row[columns[1]]).strip()
+                if val1 and val1.lower() != "nan" and val2 and val2.lower() != "nan":
+                    pairs.append((val1, val2))
+            logger.info(f"Extracted {len(pairs)} pairs from columns {columns}")
+            background_tasks.add_task(worker_process, pairs, doc_temp_paths, destination_folder, selected_columns, selected_color)
+            logger.info("Background task added for processing")
+            return {"message": "Processing started", "total_pairs": len(pairs), "total_files": len(doc_temp_paths)}
     except HTTPException:
         raise
     except Exception as e:

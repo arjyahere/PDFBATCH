@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:file_selector/file_selector.dart' show getDirectoryPath;
+
 import '../providers/highlighter_provider.dart';
 import '../utils/error_handler.dart';
 
-import 'package:file_selector/file_selector.dart' show getDirectoryPath;
-
-
+/// Screen for processing and monitoring batch highlighting
+/// 
+/// This is the third and final step in the workflow.
+/// Users can start processing, monitor progress, and download results.
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({
     super.key,
@@ -24,41 +27,209 @@ class ProgressScreen extends StatefulWidget {
 
 class _ProgressScreenState extends State<ProgressScreen> {
   final TextEditingController _destinationController = TextEditingController();
+  bool _isDownloading = false;
 
+  @override
+  void dispose() {
+    _destinationController.dispose();
+    super.dispose();
+  }
+
+  /// Select destination folder for downloads (desktop only)
   Future<void> _selectDestinationFolder() async {
     if (kIsWeb) {
-      // On web, show a message that folder selection is not supported
       if (mounted) {
         ErrorHandler.showInfoSnackBar(
           context,
-          'Folder selection is not supported on web. Files will be downloaded to your default download folder.',
+          'Folder selection is not supported on web. Files will download to your default downloads folder.',
         );
       }
       return;
     }
 
     try {
-      final String? selectedDirectory = await getDirectoryPath();
-      if (selectedDirectory != null && mounted) {
+      final selectedDirectory = await getDirectoryPath();
+      if (!mounted) return;
+      
+      if (selectedDirectory != null) {
         setState(() {
           _destinationController.text = selectedDirectory;
         });
-      }
-    } catch (e) {
-      if (mounted) {
-        ErrorHandler.showErrorSnackBar(
+        ErrorHandler.showSuccessSnackBar(
           context,
-          'Error selecting folder: $e',
-          retryAction: _selectDestinationFolder,
+          'Destination folder selected',
         );
       }
+    } catch (e) {
+      if (!mounted) return;
+      ErrorHandler.showErrorSnackBar(
+        context,
+        'Error selecting folder: $e',
+        retryAction: _selectDestinationFolder,
+      );
     }
   }
 
-  @override
-  void dispose() {
-    _destinationController.dispose();
-    super.dispose();
+  /// Start the processing
+  Future<void> _startProcessing(HighlighterProvider provider) async {
+    final error = await provider.startProcess(
+      destinationFolder: _destinationController.text.trim().isEmpty
+          ? null
+          : _destinationController.text.trim(),
+    );
+    
+    if (!mounted) return;
+    
+    if (error != null) {
+      ErrorHandler.showErrorSnackBar(
+        context,
+        error,
+        retryAction: () => _startProcessing(provider),
+      );
+    } else {
+      ErrorHandler.showSuccessSnackBar(
+        context,
+        'Processing started successfully',
+      );
+    }
+  }
+
+  /// Pause processing
+  Future<void> _pauseProcessing(HighlighterProvider provider) async {
+    final error = await provider.pauseProcess();
+    if (!mounted) return;
+    
+    if (error != null) {
+      ErrorHandler.showErrorSnackBar(context, error);
+    } else {
+      ErrorHandler.showInfoSnackBar(context, 'Processing paused');
+    }
+  }
+
+  /// Resume processing
+  Future<void> _resumeProcessing(HighlighterProvider provider) async {
+    final error = await provider.resumeProcess();
+    if (!mounted) return;
+    
+    if (error != null) {
+      ErrorHandler.showErrorSnackBar(context, error);
+    } else {
+      ErrorHandler.showSuccessSnackBar(context, 'Processing resumed');
+    }
+  }
+
+  /// Stop processing
+  Future<void> _stopProcessing(HighlighterProvider provider) async {
+    final confirmed = await _showStopConfirmation();
+    if (!confirmed || !mounted) return;
+
+    final error = await provider.stopProcess();
+    if (!mounted) return;
+    
+    if (error != null) {
+      ErrorHandler.showErrorSnackBar(context, error);
+    } else {
+      ErrorHandler.showInfoSnackBar(context, 'Processing stopped');
+    }
+  }
+
+  /// Show stop confirmation dialog
+  Future<bool> _showStopConfirmation() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Stop Processing?'),
+        content: const Text(
+          'Are you sure you want to stop the current processing? '
+          'This will cancel all pending operations.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Stop'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  /// Download processed documents
+  Future<void> _downloadProcessed(HighlighterProvider provider) async {
+    setState(() => _isDownloading = true);
+    
+    final error = await provider.downloadProcessedPdfs();
+    
+    setState(() => _isDownloading = false);
+    
+    if (!mounted) return;
+    
+    if (error != null) {
+      ErrorHandler.showErrorSnackBar(
+        context,
+        error,
+        retryAction: () => _downloadProcessed(provider),
+      );
+    } else {
+      ErrorHandler.showSuccessSnackBar(
+        context,
+        kIsWeb
+            ? 'Documents downloaded to your downloads folder'
+            : 'Documents saved to destination folder',
+      );
+    }
+  }
+
+  /// Download combined log
+  Future<void> _downloadLog(HighlighterProvider provider) async {
+    if (provider.combinedLogFile == null) return;
+    
+    setState(() => _isDownloading = true);
+    
+    final error = await provider.downloadFile(provider.combinedLogFile!);
+    
+    setState(() => _isDownloading = false);
+    
+    if (!mounted) return;
+    
+    if (error != null) {
+      ErrorHandler.showErrorSnackBar(context, error);
+    } else {
+      ErrorHandler.showSuccessSnackBar(
+        context,
+        'Combined log downloaded successfully',
+      );
+    }
+  }
+
+  /// Download unmatched values
+  Future<void> _downloadUnmatched(HighlighterProvider provider) async {
+    if (provider.unmatchedValuesFile == null) return;
+    
+    setState(() => _isDownloading = true);
+    
+    final error = await provider.downloadFile(provider.unmatchedValuesFile!);
+    
+    setState(() => _isDownloading = false);
+    
+    if (!mounted) return;
+    
+    if (error != null) {
+      ErrorHandler.showErrorSnackBar(context, error);
+    } else {
+      ErrorHandler.showSuccessSnackBar(
+        context,
+        'Unmatched values downloaded successfully',
+      );
+    }
   }
 
   @override
@@ -68,518 +239,655 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     return Consumer<HighlighterProvider>(
       builder: (context, provider, child) {
-        return Column(
+        return Stack(
           children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Step 3: Process & Download',
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 20 : 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Start the batch highlighting process and monitor progress. Download the processed files and logs when complete.',
-                      style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
-                    ),
-                    const SizedBox(height: 24),
-
-              // Process Controls
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Processing Controls',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Destination Folder Selection
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _destinationController,
-                              decoration: const InputDecoration(
-                                labelText: 'Destination Folder (Optional)',
-                                hintText: 'Leave empty for default location',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.folder),
-                              ),
-                              enabled: !provider.isProcessing,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                             onPressed: !provider.isProcessing && !kIsWeb ? _selectDestinationFolder : null,
-                             icon: const Icon(Icons.folder_open),
-                             tooltip: kIsWeb ? 'Not supported on web' : 'Select Folder',
-                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Control Buttons
-                      if (isSmallScreen)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: (provider.selectedColumn != null && !provider.isProcessing)
-                                  ? () async {
-                                      final error = await provider.startProcess(
-                                        destinationFolder: _destinationController.text.trim().isEmpty
-                                            ? null
-                                            : _destinationController.text.trim(),
-                                      );
-                                      if (error != null && mounted) {
-                                        // ignore: use_build_context_synchronously
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Error: $error'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  : null,
-                              icon: const Icon(Icons.play_arrow),
-                              label: const Text('Start Processing'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                            if (provider.isProcessing) ...[
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  IconButton(
-                                    onPressed: () async {
-                                      final error = await provider.pauseProcess();
-                                      if (error != null && mounted) {
-                                        // ignore: use_build_context_synchronously
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Error: $error')),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.pause),
-                                    tooltip: 'Pause',
-                                  ),
-                                  IconButton(
-                                    onPressed: () async {
-                                      final error = await provider.resumeProcess();
-                                      if (error != null && mounted) {
-                                        // ignore: use_build_context_synchronously
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Error: $error')),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.play_arrow),
-                                    tooltip: 'Resume',
-                                  ),
-                                  IconButton(
-                                    onPressed: () async {
-                                      final error = await provider.stopProcess();
-                                      if (error != null && mounted) {
-                                        ErrorHandler.showErrorSnackBar(context, error);
-                                      }
-                                    },
-                                    icon: const Icon(Icons.stop),
-                                    tooltip: 'Stop',
-                                    color: Colors.red,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        )
-                      else
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: (provider.selectedColumn != null && !provider.isProcessing)
-                                    ? () async {
-                                        final error = await provider.startProcess(
-                                          destinationFolder: _destinationController.text.trim().isEmpty
-                                              ? null
-                                              : _destinationController.text.trim(),
-                                        );
-                                        if (error != null && mounted) {
-                                          ErrorHandler.showErrorSnackBar(
-                                            context,
-                                            error,
-                                            retryAction: () async {
-                                              final retryError = await provider.startProcess(
-                                                destinationFolder: _destinationController.text.trim().isEmpty
-                                                    ? null
-                                                    : _destinationController.text.trim(),
-                                              );
-                                              if (retryError != null) {
-                                                if (mounted) {
-                                                  ErrorHandler.showErrorSnackBar(context, retryError);
-                                                }
-                                              }
-                                            },
-                                          );
-                                        }
-                                      }
-                                    : null,
-                                icon: const Icon(Icons.play_arrow),
-                                label: const Text('Start Processing'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            if (provider.isProcessing) ...[
-                              IconButton(
-                                onPressed: () async {
-                                  final error = await provider.pauseProcess();
-                                  if (error != null && mounted) {
-                                    ErrorHandler.showErrorSnackBar(context, error);
-                                  }
-                                },
-                                icon: const Icon(Icons.pause),
-                                tooltip: 'Pause',
-                              ),
-                              IconButton(
-                                onPressed: () async {
-                                  final error = await provider.resumeProcess();
-                                  if (error != null && mounted) {
-                                    ErrorHandler.showErrorSnackBar(context, error);
-                                  }
-                                },
-                                icon: const Icon(Icons.play_arrow),
-                                tooltip: 'Resume',
-                              ),
-                              IconButton(
-                                onPressed: () async {
-                                  final error = await provider.stopProcess();
-                                  if (error != null && mounted) {
-                                    ErrorHandler.showErrorSnackBar(context, error);
-                                  }
-                                },
-                                icon: const Icon(Icons.stop),
-                                tooltip: 'Stop',
-                                color: Colors.red,
-                              ),
-                            ],
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Progress Display
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            'Progress',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${provider.progress.toStringAsFixed(1)}%',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      LinearProgressIndicator(
-                        value: provider.progress / 100,
-                        backgroundColor: Colors.grey[300],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          provider.progress >= 100 ? Colors.green : Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        provider.status,
-                        style: TextStyle(
-                          color: provider.status.contains('Error') || provider.status == 'Stopped'
-                              ? Colors.red
-                              : provider.progress >= 100
-                                  ? Colors.green
-                                  : Colors.black,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Logs Preview
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: const Text(
-                              'Processing Logs',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          TextButton.icon(
-                            onPressed: provider.logs.isNotEmpty
-                                ? () => Navigator.pushNamed(context, '/logs')
-                                : null,
-                            icon: const Icon(Icons.list),
-                            label: const Text('View All'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (provider.logs.isEmpty)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Text(
-                              'No logs yet. Start processing to see results.',
-                              style: TextStyle(color: Colors.grey),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        )
-                      else
-                        SizedBox(
-                          height: 200,
-                          child: ListView.builder(
-                            itemCount: provider.logs.length,
-                            itemBuilder: (context, index) {
-                              final log = provider.logs[provider.logs.length - 1 - index]; // Show latest first
-                              return ListTile(
-                                dense: true,
-                                leading: Icon(
-                                  log['Note']?.contains('Exact match') == true
-                                      ? Icons.check_circle
-                                      : log['Note']?.contains('Error') == true
-                                          ? Icons.error
-                                          : Icons.info,
-                                  color: log['Note']?.contains('Exact match') == true
-                                      ? Colors.green
-                                      : log['Note']?.contains('Error') == true
-                                          ? Colors.red
-                                          : Colors.blue,
-                                  size: 20,
-                                ),
-                                title: Text(
-                                  log['File'] ?? '',
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                subtitle: Text(
-                                  '${log['Page/Paragraph'] ?? ''} • ${log['Matched Value'] ?? 'N/A'}',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                trailing: Text(
-                                  log['Timestamp'] != null
-                                      ? DateFormat('HH:mm:ss').format(DateTime.parse(log['Timestamp']))
-                                      : '',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Download Section
-              if (provider.progress >= 100)
-                Card(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+            Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Download Results',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Processing complete! Download the highlighted documents, logs, and unmatched values.',
-                        ),
-                        const SizedBox(height: 16),
+                        _buildHeader(context, isSmallScreen),
+                        const SizedBox(height: 24),
 
-                        // Download Processed PDFs Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              final error = await provider.downloadProcessedPdfs();
-                              if (error != null && mounted) {
-                                ErrorHandler.showErrorSnackBar(context, error);
-                              } else if (mounted) {
-                                ErrorHandler.showSuccessSnackBar(
-                                  context,
-                                  'Processed PDFs are available in the destination folder. Check the logs for specific file locations.',
-                                );
-                              }
-                            },
-                            icon: const Icon(Icons.download),
-                            label: const Text('Download Processed PDFs'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
+                        // Processing Controls
+                        _buildControlsCard(context, provider, isSmallScreen),
+                        const SizedBox(height: 24),
 
-                        if (provider.combinedLogFile != null)
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                final error = await provider.downloadFile(provider.combinedLogFile!);
-                                if (error != null && mounted) {
-                                  ErrorHandler.showErrorSnackBar(context, error);
-                                } else if (mounted) {
-                                  ErrorHandler.showSuccessSnackBar(context, 'Combined log downloaded successfully.');
-                                }
-                              },
-                              icon: const Icon(Icons.download),
-                              label: const Text('Download Combined Log (CSV)'),
-                            ),
-                          ),
-                        const SizedBox(height: 8),
-                        if (provider.unmatchedValuesFile != null)
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                final error = await provider.downloadFile(provider.unmatchedValuesFile!);
-                                if (!mounted) return;
-                                if (error != null) {
-                                  ErrorHandler.showErrorSnackBar(context, error);
-                                } else {
-                                  ErrorHandler.showSuccessSnackBar(context, 'Unmatched values downloaded successfully.');
-                                }
-                              },
-                              icon: const Icon(Icons.download),
-                              label: const Text('Download Unmatched Values (CSV)'),
-                            ),
-                          ),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.check_circle, color: Colors.green),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'All processed files are available in the destination folder. Check the logs for specific file locations.',
-                                  style: TextStyle(color: Colors.green),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        // Progress Display
+                        _buildProgressCard(context, provider),
+                        const SizedBox(height: 24),
+
+                        // Logs Preview
+                        _buildLogsPreviewCard(context, provider, isSmallScreen),
+                        const SizedBox(height: 24),
+
+                        // Download Section (shown when complete)
+                        if (provider.progress >= 100)
+                          _buildDownloadCard(context, provider),
                       ],
                     ),
                   ),
                 ),
-            ],
-          ),
-        ),
-            ),
 
-            // Navigation Buttons
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                border: Border(
-                  top: BorderSide(color: Theme.of(context).dividerColor),
+                // Navigation Buttons
+                _buildNavigationButtons(context, provider),
+              ],
+            ),
+            
+            // Loading overlay during downloads
+            if (_isDownloading)
+              const ColoredBox(
+                color: Colors.black54,
+                child: Center(
+                  child: CircularProgressIndicator(),
                 ),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: widget.onBack ?? () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back),
-                      label: const Text('Back'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: provider.progress >= 100 ? (widget.onViewLogs ?? () => Navigator.of(context).pushNamed('/logs')) : null,
-                      icon: const Icon(Icons.list),
-                      label: const Text('View Logs'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         );
       },
+    );
+  }
+
+  /// Build the screen header
+  Widget _buildHeader(BuildContext context, bool isSmallScreen) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Step 3: Process & Download',
+          style: TextStyle(
+            fontSize: isSmallScreen ? 20 : 24,
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Start the batch highlighting process and monitor progress. '
+          'Download the processed files and logs when complete.',
+          style: TextStyle(
+            fontSize: isSmallScreen ? 14 : 16,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build the controls card
+  Widget _buildControlsCard(
+    BuildContext context,
+    HighlighterProvider provider,
+    bool isSmallScreen,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.settings, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Processing Controls',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Destination Folder Selection
+            if (!kIsWeb)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _destinationController,
+                      style: TextStyle(color: colorScheme.onSurface),
+                      decoration: InputDecoration(
+                        labelText: 'Destination Folder (Optional)',
+                        hintText: 'Leave empty for default location',
+                        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant.withAlpha(128)),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.folder, color: colorScheme.onSurfaceVariant),
+                        enabled: !provider.isProcessing,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: !provider.isProcessing
+                        ? _selectDestinationFolder
+                        : null,
+                    icon: const Icon(Icons.folder_open),
+                    tooltip: 'Select Folder',
+                  ),
+                ],
+              ),
+            if (!kIsWeb) const SizedBox(height: 16),
+
+            // Control Buttons
+            _buildControlButtons(context, provider, isSmallScreen),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build control buttons
+  Widget _buildControlButtons(
+    BuildContext context,
+    HighlighterProvider provider,
+    bool isSmallScreen,
+  ) {
+    final canStart = provider.selectedColumns.isNotEmpty &&
+        !provider.isProcessing;
+
+    if (isSmallScreen) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ElevatedButton.icon(
+            onPressed: canStart ? () => _startProcessing(provider) : null,
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Start Processing'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+          if (provider.isProcessing) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                IconButton(
+                  onPressed: () => _pauseProcessing(provider),
+                  icon: const Icon(Icons.pause),
+                  tooltip: 'Pause',
+                ),
+                IconButton(
+                  onPressed: () => _resumeProcessing(provider),
+                  icon: const Icon(Icons.play_arrow),
+                  tooltip: 'Resume',
+                ),
+                IconButton(
+                  onPressed: () => _stopProcessing(provider),
+                  icon: const Icon(Icons.stop),
+                  tooltip: 'Stop',
+                  color: Colors.red,
+                ),
+              ],
+            ),
+          ],
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: canStart ? () => _startProcessing(provider) : null,
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Start Processing'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+        if (provider.isProcessing) ...[
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: () => _pauseProcessing(provider),
+            icon: const Icon(Icons.pause),
+            tooltip: 'Pause',
+          ),
+          IconButton(
+            onPressed: () => _resumeProcessing(provider),
+            icon: const Icon(Icons.play_arrow),
+            tooltip: 'Resume',
+          ),
+          IconButton(
+            onPressed: () => _stopProcessing(provider),
+            icon: const Icon(Icons.stop),
+            tooltip: 'Stop',
+            color: Colors.red,
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Build the progress card
+  Widget _buildProgressCard(BuildContext context, HighlighterProvider provider) {
+    final isComplete = provider.progress >= 100;
+    final hasError = provider.status.toLowerCase().contains('error') ||
+        provider.status.toLowerCase().contains('failed');
+    final isStopped = provider.status.toLowerCase().contains('stopped');
+    final colorScheme = Theme.of(context).colorScheme;
+
+    Color progressColor;
+    if (hasError || isStopped) {
+      progressColor = Colors.red;
+    } else if (isComplete) {
+      progressColor = Colors.green;
+    } else {
+      progressColor = colorScheme.primary;
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.trending_up, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Progress',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${provider.progress.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: progressColor,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: provider.progress / 100,
+                backgroundColor: colorScheme.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                minHeight: 8,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  hasError
+                      ? Icons.error
+                      : isComplete
+                          ? Icons.check_circle
+                          : Icons.info,
+                  color: progressColor,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    provider.status,
+                    style: TextStyle(
+                      color: hasError || isComplete || isStopped
+                          ? progressColor
+                          : colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build the logs preview card
+  Widget _buildLogsPreviewCard(BuildContext context, HighlighterProvider provider, bool isSmallScreen) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final totalLogs = provider.logs.length;
+    final matchCount = provider.logs.where((log) {
+      final note = log['Note']?.toString().toLowerCase() ?? '';
+      return note.contains('exact match');
+    }).length;
+    final errorCount = provider.logs.where((log) {
+      final note = log['Note']?.toString().toLowerCase() ?? '';
+      return note.contains('error') || note.contains('failed');
+    }).length;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.list_alt, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Processing Logs',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                if (totalLogs > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      '$totalLogs entries',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: provider.logs.isNotEmpty
+                      ? widget.onViewLogs ??
+                          () => Navigator.pushNamed(context, '/logs')
+                      : null,
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('View All'),
+                ),
+              ],
+            ),
+            if (totalLogs > 0) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: [
+                  _buildLogStatChip(
+                    context,
+                    icon: Icons.check_circle,
+                    label: '$matchCount matches',
+                    color: Colors.green,
+                  ),
+                  _buildLogStatChip(
+                    context,
+                    icon: Icons.error,
+                    label: '$errorCount errors',
+                    color: Colors.red,
+                  ),
+                  _buildLogStatChip(
+                    context,
+                    icon: Icons.info,
+                    label: '${totalLogs - matchCount - errorCount} info',
+                    color: colorScheme.primary,
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+            if (provider.logs.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      Icon(Icons.article_outlined, size: 48, color: colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No logs yet. Start processing to see results.',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: 200,
+                child: ListView.builder(
+                  itemCount: provider.logs.length.clamp(0, 10),
+                  itemBuilder: (context, index) {
+                    // Show latest first
+                    final logIndex = provider.logs.length - 1 - index;
+                    final log = provider.logs[logIndex];
+                    return _buildLogItem(context, log, isSmallScreen);
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build a single log item
+  Widget _buildLogItem(BuildContext context, Map<String, dynamic> log, bool isSmallScreen) {
+    final note = log['Note']?.toString() ?? '';
+    final isMatch = note.contains('Exact match');
+    final isError = note.contains('Error') || note.contains('Failed');
+    final colorScheme = Theme.of(context).colorScheme;
+
+    IconData icon;
+    Color color;
+    if (isMatch) {
+      icon = Icons.check_circle;
+      color = Colors.green;
+    } else if (isError) {
+      icon = Icons.error;
+      color = Colors.red;
+    } else {
+      icon = Icons.info;
+      color = colorScheme.primary;
+    }
+
+    return ListTile(
+      dense: true,
+      leading: Icon(icon, color: color, size: 20),
+      title: Text(
+        log['File']?.toString() ?? 'Unknown',
+        style: TextStyle(
+          fontSize: 14,
+          color: colorScheme.onSurface,
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        '${log['Page/Paragraph']?.toString() ?? ''} • '
+        '${log['Matched Pair']?.toString() ?? log['Matched Value']?.toString() ?? 'N/A'}',
+        style: TextStyle(
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: log['Timestamp'] != null
+          ? Text(
+              DateFormat('HH:mm:ss').format(
+                DateTime.parse(log['Timestamp'].toString()),
+              ),
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            )
+          : null,
+    );
+  }
+
+  /// Build a log statistics chip
+  Widget _buildLogStatChip(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withAlpha(25),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withAlpha(50)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build the download card
+  Widget _buildDownloadCard(BuildContext context, HighlighterProvider provider) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      color: colorScheme.primaryContainer.withAlpha(128),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.download_done, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Download Results',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Processing complete! Download your highlighted documents and reports.',
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+
+            // Download Processed Documents
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _downloadProcessed(provider),
+                icon: const Icon(Icons.picture_as_pdf),
+                label: const Text('Download Processed Documents'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Download Combined Log
+            if (provider.combinedLogFile != null)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _downloadLog(provider),
+                  icon: const Icon(Icons.description),
+                  label: const Text('Download Combined Log (CSV)'),
+                ),
+              ),
+            const SizedBox(height: 8),
+
+            // Download Unmatched Values
+            if (provider.unmatchedValuesFile != null)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _downloadUnmatched(provider),
+                  icon: const Icon(Icons.find_in_page),
+                  label: const Text('Download Unmatched Values (CSV)'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build navigation buttons
+  Widget _buildNavigationButtons(BuildContext context, HighlighterProvider provider) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+          top: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: provider.isProcessing
+                  ? null
+                  : widget.onBack ?? () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Back'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: provider.progress >= 100
+                  ? widget.onViewLogs ??
+                      () => Navigator.pushNamed(context, '/logs')
+                  : null,
+              icon: const Icon(Icons.list),
+              label: const Text('View Logs'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

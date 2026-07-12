@@ -8,7 +8,7 @@ from ..core.utils import now_ts, append_log
 from .pdf_highlighter import pdf_highlight_file
 from .docx_highlighter import docx_highlight_file
 
-def worker_process(values_in_order, doc_files, dest_folder, selected_column, selected_color):
+def worker_process(data_in_order, doc_files, dest_folder, selected_columns, selected_color):
     processing_state["logs"].clear()
     processing_state["running"] = True
     processing_state["paused"] = False
@@ -30,13 +30,13 @@ def worker_process(values_in_order, doc_files, dest_folder, selected_column, sel
         ext = os.path.splitext(fpath)[1].lower()
         if ext == ".pdf":
             original_name = os.path.basename(fpath).replace("temp_doc_", "")  # recover real name
-            matches, logs_local, _ = pdf_highlight_file(fpath, values_in_order, selected_column, COLOR_PRESETS[selected_color]["pdf_rgb"], original_name, idx)
+            matches, logs_local, _ = pdf_highlight_file(fpath, data_in_order, selected_columns, COLOR_PRESETS[selected_color]["pdf_rgb"], original_name, idx)
         elif ext == ".docx":
             original_name = os.path.basename(fpath).replace("temp_doc_", "")
             matches, logs_local, _ = docx_highlight_file(
                 fpath,
-                values_in_order,
-                selected_column,
+                data_in_order,
+                selected_columns,
                 COLOR_PRESETS[selected_color]["docx_enum"],
                 original_name,
                 idx
@@ -44,29 +44,42 @@ def worker_process(values_in_order, doc_files, dest_folder, selected_column, sel
 
         else:
             logs_local = [{"File": os.path.basename(fpath), "Page/Paragraph": "",
-                           "Column": selected_column, "Matched Value": "",
-                           "Timestamp": now_ts(), "Output File": "",
-                           "Note": "Unsupported file format - skipped"}]
+                            "Columns": selected_columns, "Matched Pair": "",
+                            "Timestamp": now_ts(), "Output File": "",
+                            "Note": "Unsupported file format - skipped"}]
         for r in logs_local:
             append_log(r, processing_state)
         processing_state["progress"] = idx/total_files*100
 
     combined_path = os.path.join(base_folder, f"Highlight_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
-    keys = ["File", "Page/Paragraph", "Column", "Matched Value", "Timestamp", "Output File", "Note"]
+    keys = ["File", "Page/Paragraph", "Columns", "Matched Pair", "Timestamp", "Output File", "Note"]
     with open(combined_path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=keys)
         writer.writeheader()
         for row in processing_state["logs"]:
             writer.writerow({k: row.get(k, "") for k in keys})
 
-    matched_values = set(log.get("Matched Value", "") for log in processing_state["logs"])
-    unmatched = [v for v in values_in_order if v not in matched_values]
-    unmatched_path = os.path.join(base_folder, f"Unmatched_values_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
-    with open(unmatched_path, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.writer(f)
-        w.writerow([f"Unmatched Values from '{selected_column}'"])
-        for val in unmatched:
-            w.writerow([val])
+    if isinstance(data_in_order[0], tuple) if data_in_order else False:
+        # Pairs mode
+        matched_pairs = set(tuple(log.get("Matched Pair", "").split(',')) if log.get("Matched Pair") else () for log in processing_state["logs"])
+        unmatched = [p for p in data_in_order if p not in matched_pairs]
+        unmatched_path = os.path.join(base_folder, f"Unmatched_pairs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+        with open(unmatched_path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f)
+            w.writerow([f"Unmatched Pairs from '{selected_columns}'"])
+            w.writerow(["Column1", "Column2"])
+            for p1, p2 in unmatched:
+                w.writerow([p1, p2])
+    else:
+        # Single mode
+        matched_values = set(log.get("Matched Value", "") for log in processing_state["logs"])
+        unmatched = [v for v in data_in_order if v not in matched_values]
+        unmatched_path = os.path.join(base_folder, f"Unmatched_values_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+        with open(unmatched_path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f)
+            w.writerow([f"Unmatched Values from '{selected_columns}'"])
+            for val in unmatched:
+                w.writerow([val])
 
     processing_state.update({
         "running": False,
