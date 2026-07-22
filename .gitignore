@@ -41,12 +41,17 @@ app.*.map.json
 .env
 .env.*
 
-# Runtime-generated data
-# process_router writes uploaded Excel as temp_data_<filename>
-# config.py auto-creates output/ for highlighted PDFs
+# Runtime-generated data (v1.3.1 writes uploads/jobs/temp payloads here)
+input/
+temp/
+jobs/
 temp_data_*
+temp_*
 output/
 logs/
+*.db
+*.sqlite
+*.sqlite3
 
 # Input documents (public repo - keep bank statements / payroll sheets out)
 *.pdf

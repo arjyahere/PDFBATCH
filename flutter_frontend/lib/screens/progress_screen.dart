@@ -164,6 +164,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   /// Download processed documents
   Future<void> _downloadProcessed(HighlighterProvider provider) async {
+    if (provider.outputFiles.isEmpty) {
+      ErrorHandler.showInfoSnackBar(
+        context,
+        'No processed documents available',
+      );
+      return;
+    }
+    
     setState(() => _isDownloading = true);
     
     final error = await provider.downloadProcessedPdfs();
@@ -181,16 +189,20 @@ class _ProgressScreenState extends State<ProgressScreen> {
     } else {
       ErrorHandler.showSuccessSnackBar(
         context,
-        kIsWeb
-            ? 'Documents downloaded to your downloads folder'
-            : 'Documents saved to destination folder',
+        'Highlighted PDFs downloaded successfully',
       );
     }
   }
 
   /// Download combined log
   Future<void> _downloadLog(HighlighterProvider provider) async {
-    if (provider.combinedLogFile == null) return;
+    if (provider.combinedLogFile == null) {
+      ErrorHandler.showInfoSnackBar(
+        context,
+        'Matches log not available',
+      );
+      return;
+    }
     
     setState(() => _isDownloading = true);
     
@@ -205,14 +217,20 @@ class _ProgressScreenState extends State<ProgressScreen> {
     } else {
       ErrorHandler.showSuccessSnackBar(
         context,
-        'Combined log downloaded successfully',
+        'Matches log downloaded successfully',
       );
     }
   }
 
   /// Download unmatched values
   Future<void> _downloadUnmatched(HighlighterProvider provider) async {
-    if (provider.unmatchedValuesFile == null) return;
+    if (provider.unmatchedValuesFile == null) {
+      ErrorHandler.showInfoSnackBar(
+        context,
+        'Missing values report not available',
+      );
+      return;
+    }
     
     setState(() => _isDownloading = true);
     
@@ -227,7 +245,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     } else {
       ErrorHandler.showSuccessSnackBar(
         context,
-        'Unmatched values downloaded successfully',
+        'Missing values report downloaded successfully',
       );
     }
   }
@@ -250,7 +268,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildHeader(context, isSmallScreen),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
+
+                        // Large File Warning (shown when processing large files)
+                        if (provider.isLargeFile && provider.isProcessing)
+                          _buildLargeFileWarning(context, provider),
+                        if (provider.isLargeFile && provider.isProcessing)
+                          const SizedBox(height: 16),
 
                         // Processing Controls
                         _buildControlsCard(context, provider, isSmallScreen),
@@ -316,6 +340,51 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Build large file warning banner
+  Widget _buildLargeFileWarning(BuildContext context, HighlighterProvider provider) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.15),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.access_time,
+            color: Colors.orange.shade700,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Large File - Processing May Take Time',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.orange.shade800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  provider.getLargeFileWarningMessage(),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -568,14 +637,34 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Widget _buildLogsPreviewCard(BuildContext context, HighlighterProvider provider, bool isSmallScreen) {
     final colorScheme = Theme.of(context).colorScheme;
     final totalLogs = provider.logs.length;
+    
+    // Match: any successful highlight (contains 'highlight', 'match', or 'exact match')
+    // but NOT error-related notes
     final matchCount = provider.logs.where((log) {
       final note = log['Note']?.toString().toLowerCase() ?? '';
-      return note.contains('exact match');
+      final isMatchNote = note.contains('highlight') || 
+                          note.contains('match') || 
+                          note.contains('exact match');
+      final isErrorNote = note.contains('error') || 
+                          note.contains('failed') || 
+                          note.contains('skip');
+      // Also check if there's an error code
+      final hasErrorCode = log['Error Code'] != null && log['Error Code'].toString().isNotEmpty;
+      return isMatchNote && !isErrorNote && !hasErrorCode;
     }).length;
+    
+    // Error: notes containing error/failed/skip OR has error code
     final errorCount = provider.logs.where((log) {
       final note = log['Note']?.toString().toLowerCase() ?? '';
-      return note.contains('error') || note.contains('failed');
+      final hasErrorCode = log['Error Code'] != null && log['Error Code'].toString().isNotEmpty;
+      return note.contains('error') || 
+             note.contains('failed') || 
+             note.contains('skip') ||
+             hasErrorCode;
     }).length;
+    
+    // Info: all other logs (skipped, unsupported, etc.)
+    final infoCount = totalLogs - matchCount - errorCount;
 
     return Card(
       child: Padding(
@@ -644,7 +733,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   _buildLogStatChip(
                     context,
                     icon: Icons.info,
-                    label: '${totalLogs - matchCount - errorCount} info',
+                    label: '$infoCount info',
                     color: colorScheme.primary,
                   ),
                 ],
@@ -690,8 +779,22 @@ class _ProgressScreenState extends State<ProgressScreen> {
   /// Build a single log item
   Widget _buildLogItem(BuildContext context, Map<String, dynamic> log, bool isSmallScreen) {
     final note = log['Note']?.toString() ?? '';
-    final isMatch = note.contains('Exact match');
-    final isError = note.contains('Error') || note.contains('Failed');
+    final noteLower = note.toLowerCase();
+    
+    // Match: any successful highlight (contains 'highlight', 'match', or 'exact match')
+    // but NOT error-related notes
+    final isMatchNote = noteLower.contains('highlight') || 
+                        noteLower.contains('match') || 
+                        noteLower.contains('exact match');
+    final isErrorNote = noteLower.contains('error') || 
+                        noteLower.contains('failed') || 
+                        noteLower.contains('skip');
+    // Also check if there's an error code
+    final hasErrorCode = log['Error Code'] != null && log['Error Code'].toString().isNotEmpty;
+    
+    final isMatch = isMatchNote && !isErrorNote && !hasErrorCode;
+    final isError = isErrorNote || hasErrorCode;
+    
     final colorScheme = Theme.of(context).colorScheme;
 
     IconData icon;
@@ -809,39 +912,54 @@ class _ProgressScreenState extends State<ProgressScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => _downloadProcessed(provider),
+                onPressed: provider.outputFiles.isNotEmpty 
+                    ? () => _downloadProcessed(provider)
+                    : null,
                 icon: const Icon(Icons.picture_as_pdf),
-                label: const Text('Download Processed Documents'),
+                label: const Text('Download Highlighted PDFs'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
             const SizedBox(height: 8),
 
-            // Download Combined Log
-            if (provider.combinedLogFile != null)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _downloadLog(provider),
-                  icon: const Icon(Icons.description),
-                  label: const Text('Download Combined Log (CSV)'),
+            // Download Matches Log
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: provider.combinedLogFile != null
+                    ? () => _downloadLog(provider)
+                    : null,
+                icon: const Icon(Icons.description),
+                label: const Text('Download Matches (CSV)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
+            ),
             const SizedBox(height: 8),
 
-            // Download Unmatched Values
-            if (provider.unmatchedValuesFile != null)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _downloadUnmatched(provider),
-                  icon: const Icon(Icons.find_in_page),
-                  label: const Text('Download Unmatched Values (CSV)'),
+            // Download Missing Values
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: provider.unmatchedValuesFile != null
+                    ? () => _downloadUnmatched(provider)
+                    : null,
+                icon: const Icon(Icons.find_in_page),
+                label: const Text('Download Missing Values (CSV)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
+            ),
           ],
         ),
       ),

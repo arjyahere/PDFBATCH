@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Backend Working Documentation Preview</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #4a5568;
+            margin-top: 20px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border-left: 3px solid #3498db;
+        }
+        code {
+            font-family: 'Courier New', monospace;
+            background-color: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        ul {
+            line-height: 1.6;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .file-path {
+            color: #6c757d;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Backend Working Documentation Preview</h1>
+        <p>This is a preview of the backend working documentation for the Batch Highlighter API. The actual documentation is in <code>BACKEND_WORKING.md</code>.</p>
+        
+        <h2>Document Structure</h2>
+        <ul>
+            <li><strong>Quick Navigation</strong> - Table of contents with links to all sections</li>
+            <li><strong>Project Overview</strong> - Description of the project and its goals</li>
+            <li><strong>Project Structure</strong> - Directory structure with file descriptions</li>
+            <li><strong>Architecture</strong> - System architecture with module descriptions</li>
+            <li><strong>API Endpoints</strong> - Detailed API endpoint documentation</li>
+            <li><strong>Business Logic Layer</strong> - Services and core functionality</li>
+            <li><strong>Data Access Layer</strong> - Job repository and data management</li>
+            <li><strong>Highlighting Engines</strong> - PDF and DOCX highlighting engines</li>
+            <li><strong>Configuration</strong> - Application settings and configuration</li>
+            <li><strong>Data Flow</strong> - Process flow diagrams and data handling</li>
+            <li><strong>Key Features</strong> - System features and capabilities</li>
+            <li><strong>Dependencies</strong> - Python dependencies and system requirements</li>
+            <li><strong>Running the System</strong> - Startup commands and procedures</li>
+            <li><strong>Monitoring and Maintenance</strong> - Health checks and monitoring</li>
+            <li><strong>API Documentation</strong> - Swagger and ReDoc documentation</li>
+            <li><strong>Conclusion</strong> - Summary and future considerations</li>
+        </ul>
+        
+        <h2>Key Files Documented</h2>
+        <ul>
+            <li><code>main.py</code> - Application entry point</li>
+            <li><code>app/api.py</code> - FastAPI configuration</li>
+            <li><code>app/state.py</code> - State management</li>
+            <li><code>app/routers/process_router.py</code> - File processing endpoints</li>
+            <li><code>app/routers/progress_router.py</code> - Progress tracking endpoints</li>
+            <li><code>app/routers/download_router.py</code> - File download endpoints</li>
+            <li><code>app/routers/misc_router.py</code> - Miscellaneous endpoints</li>
+            <li><code>app/services/job_queue.py</code> - Job queue management</li>
+            <li><code>app/services/queue_worker.py</code> - Queue worker implementation</li>
+            <li><code>app/services/worker.py</code> - Background processing</li>
+            <li><code>app/services/pdf_highlighter.py</code> - PDF highlighting service</li>
+            <li><code>app/services/single_column_engine.py</code> - Single column highlighting</li>
+            <li><code>app/services/multi_column_engine.py</code> - Multi column highlighting</li>
+            <li><code>app/services/docx_highlighter.py</code> - DOCX highlighting</li>
+            <li><code>app/repositories/job_repository.py</code> - Job repository</li>
+            <li><code>app/dependencies/service_factory.py</code> - Service factory</li>
+            <li><code>app/core/exceptions.py</code> - Custom exceptions</li>
+            <li><code>app/core/error_codes.py</code> - Error codes and categories</li>
+            <li><code>app/core/exception_handlers.py</code> - Exception handlers</li>
+            <li><code>app/config/settings.py</code> - Configuration settings</li>
+            <li><code>app/schemas/process_schemas.py</code> - Request/response schemas</li>
+        </ul>
+        
+        <h2>Key Features</h2>
+        <ul>
+            <li>Batch document processing</li>
+            <li>PDF and DOCX file support</li>
+            <li>Single and multi-column PDF highlighting</li>
+            <li>Excel/CSV data input</li>
+            <li>Real-time progress tracking</li>
+            <li>Job queue management</li>
+            <li>Background worker processes</li>
+            <li>Downloadable reports</li>
+            <li>Error handling and recovery</li>
+        </ul>
+        
+        <h2>Running the Application</h2>
+        <pre><code># Development mode
+python main.py
+
+# Production mode
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app
+
+# Check health
+curl http://localhost:8000/health
+</code></pre>
+    </div>
+</body>
+</html>

@@ -94,7 +94,7 @@ class AppConfig {
   static Duration get downloadTimeout => const Duration(seconds: 60);
 
   /// Polling interval for progress updates
-  static Duration get progressPollingInterval => const Duration(seconds: 1);
+  static Duration get progressPollingInterval => const Duration(seconds: 10);
 
   /// Normalize URL (remove trailing slash)
   static String _normalizeUrl(String url) {

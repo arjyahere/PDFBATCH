@@ -48,7 +48,7 @@ class _LogsScreenState extends State<LogsScreen> {
       case 'Matches':
         logs = logs.where((log) {
           final note = log['Note']?.toString().toLowerCase() ?? '';
-          return note.contains('exact match');
+          return note.contains('method') && !note.contains('error') && !note.contains('failed');
         }).toList();
         break;
       case 'Errors':
@@ -230,7 +230,7 @@ class _LogsScreenState extends State<LogsScreen> {
     final totalLogs = provider.logs.length;
     final matches = provider.logs.where((log) {
       final note = log['Note']?.toString().toLowerCase() ?? '';
-      return note.contains('exact match');
+      return note.contains('method') && !note.contains('error') && !note.contains('failed');
     }).length;
     final errors = provider.logs.where((log) {
       final note = log['Note']?.toString().toLowerCase() ?? '';
@@ -341,7 +341,7 @@ class _LogsScreenState extends State<LogsScreen> {
   /// Build a single log card
   Widget _buildLogCard(Map<String, dynamic> log, bool isSmallScreen) {
     final note = log['Note']?.toString() ?? '';
-    final isMatch = note.toLowerCase().contains('exact match');
+    final isMatch = note.toLowerCase().contains('method') && !note.toLowerCase().contains('error') && !note.toLowerCase().contains('failed');
     final isError = note.toLowerCase().contains('error') ||
         note.toLowerCase().contains('failed');
 

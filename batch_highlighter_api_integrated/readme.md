@@ -1,229 +1,363 @@
-# ✅ PDF UAN / ESI Highlighter API
+# Batch Highlighter API
 
-A **FastAPI-based backend system** to match **UAN / ESI numbers from
-Excel files** against **PDF documents** and automatically **highlight
-matching entries** in the PDFs with full progress tracking and safe
-output handling.
+A **FastAPI-based backend system** to match **values from data files** (CSV/Excel) against **PDF/DOCX documents** and automatically **highlight matching entries** with full progress tracking and safe output handling.
 
 ------------------------------------------------------------------------
 
-## 📌 Overview
+## Overview
 
-This API allows you to upload: - An **Excel file** containing UAN or ESI
-numbers - One or more **PDF files**
+This API allows you to upload:
+- A **CSV or Excel file** containing values to search for
+- One or more **PDF or DOCX documents**
 
-The system will: - Automatically **detect the correct UAN/ESI column** -
-Perform **robust matching (including split-digit recovery)** -
-**Highlight matching rows directly inside the PDF** - Store the
-processed files safely in an **auto-created output folder** - Provide
-**live progress tracking** during processing
+The system will:
+- Extract column values from the data file
+- Perform **robust matching** in documents
+- **Highlight matching text** directly in the documents
+- Store processed files safely in an **output folder**
+- Provide **live progress tracking** during processing
+- Support **pause/resume/cancel** operations
 
-This solution is optimized for **bulk PF & ESIC verification and
-compliance workflows**.
-
-------------------------------------------------------------------------
-
-## 🚀 Key Features
-
-✅ Excel-based number matching\
-✅ Automatic UAN / ESI column detection\
-✅ 100% UAN split-digit recovery logic\
-✅ Global fallback matching for difficult PDFs\
-✅ PDF overwrite protection\
-✅ Background task processing (non-blocking)\
-✅ Pause / Resume support\
-✅ Output auto-save to `/output` folder\
-✅ REST API-based architecture
+This solution is optimized for **bulk document verification and annotation workflows**.
 
 ------------------------------------------------------------------------
 
-## 🛠 Technology Stack
+## Key Features
 
-  Component          Technology
-  ------------------ -------------------------
-  Language           Python 3.9+
-  API Framework      FastAPI
-  PDF Processing     PyMuPDF (fitz)
-  Excel Handling     Pandas, OpenPyXL
-  Server             Uvicorn
-  Background Tasks   FastAPI BackgroundTasks
+- CSV/Excel-based value matching
+- Multi-column support (search for 1 or 2 columns)
+- Multiple highlight colors (Yellow, Green, Cyan, Pink, Blue, Red)
+- Global fallback matching for difficult documents
+- PDF/DOCX overwrite protection
+- Background task processing (non-blocking)
+- Pause / Resume / Cancel support
+- Output auto-save to `/output` folder
+- REST API-based architecture
+- **Load Balancing with Multiple Workers**
+- **Job Queue System** for concurrent processing
 
 ------------------------------------------------------------------------
 
-## 📁 Project Structure
+## Technology Stack
 
-``` text
+| Component          |   Technology     |
+|--------------------|------------------|
+| Language           | Python 3.9+      |
+| API Framework      | FastAPI          |
+| PDF Processing     | PyMuPDF (fitz)   |
+| DOCX Processing    | python-docx      |
+| Excel/CSV Handling | Pandas, OpenPyXL |
+| Server             | Uvicorn          |
+| Background Tasks   | asyncio Queue    |
+| Load Balancing     | Uvicorn Workers  |
+
+------------------------------------------------------------------------
+
+## Project Structure
+
+```
 project_root/
 │
 ├── app/
+│   ├── __init__.py
+│   ├── api.py                           # Application entry point (FastAPI app)
+│   ├── config/
+│   │   ├── __init__.py
+│   │   ├── logging_config.py            # Logging configuration
+│   │   └── settings.py                  # Application settings
 │   ├── core/
-│   │   ├── utils.py           # Utility functions
-│   │   └── state.py           # Global state & progress tracking
-│   ├── services/
-│   │   └── pdf_highlighter.py # Core PDF processing logic
-│   ├── routes/
-│   │   └── api.py             # API endpoints
-│   └── main.py                # Application entry point
+│   │   ├── __init__.py
+│   │   ├── config.py                    # Core configuration
+│   │   ├── error_codes.py               # Error code definitions
+│   │   ├── exception_handlers.py        # Custom exception handlers
+│   │   ├── exceptions.py                # Custom exceptions
+│   │   ├── state.py                     # Global state & progress tracking
+│   │   └── utils.py                     # Utility functions
+│   ├── dependencies/
+│   │   ├── __init__.py
+│   │   └── service_factory.py           # Dependency injection factory
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   └── job_repository.py            # Job repository
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   ├── download_router.py           # Download endpoints
+│   │   ├── misc_router.py               # Miscellaneous endpoints
+│   │   ├── process_router.py            # Process/execute endpoints
+│   │   └── progress_router.py           # Progress tracking endpoints
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── common_schemas.py            # Common Pydantic schemas
+│   │   └── process_schemas.py           # Process-related schemas
+│   └── services/
+│       ├── __init__.py
+│       ├── docx_highlighter.py          # DOCX highlighting logic
+│       ├── job_queue.py                 # Job queue management
+│       ├── multi_column_engine.py       # Multi-column PDF processing
+│       ├── pdf_highlighter.py           # Core PDF processing logic
+│       ├── pdf_highlighter_decider.py   # PDF processing decider
+│       ├── queue_worker.py              # Queue worker
+│       ├── single_column_engine.py      # Single-column PDF processing
+│       └── worker.py                    # Worker implementation
 │
-├── output/                    # Auto-created highlighted PDFs
-├── requirements.txt           # Python dependencies
-└── README.md                  # Project documentation
+├── input/                               # Input files directory
+├── output/                              # Processed output files
+├── logs/                                # Application logs
+├── .env                                 # Environment variables
+├── requirements.txt                     # Python dependencies
+├── run_cluster.py                       # Advanced cluster manager with load balancer
+├── start_cluster.bat                    # Windows startup script
+├── start_cluster.sh                     # Linux/Mac startup script
+├── main.py                              # Main application entry
+├── API_DOCUMENTATION.md                 # API documentation
+└── README.md                            # Project documentation
 ```
 
 ------------------------------------------------------------------------
 
-## ⚙️ Installation & Setup
+## Installation & Setup
 
-### 1️⃣ Create Virtual Environment
+### 1. Create Virtual Environment
 
-``` bash
+```bash
 py -m venv .venv
-
+# or
 python -m venv .venv
 ```
 
 Activate it:
 
-``` bash
+```bash
 # Linux / Mac
 source .venv/bin/activate
 
 # Windows
-
 .venv\Scripts\activate
 ```
 
-------------------------------------------------------------------------
+### 2. Install Dependencies
 
-### 2️⃣ Install Dependencies
-
-``` bash
+```bash
 pip install -r requirements.txt
 ```
 
 ------------------------------------------------------------------------
 
-### 3️⃣ Run the Server
+## Running the Server
 
-``` bash
-uvicorn app.main:app --reload
+### Single Instance (Development)
+
+```bash
+python main.py
+```
+
+Or with auto-reload:
+
+```bash
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-cloudflared tunnel --url http://localhost:8000
+```
 
+### Multiple Workers (Production)
 
-flutter clean
-flutter pub get
-flutter build web
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 8
+```
 
-flutter run -d web-server --web-port=8080 --web-hostname=0.0.0.0 
-or
+### Using Batch Script (Windows)
 
-cd build\web
-python -m http.server 8080
+```bash
+start_cluster.bat
+```
 
+### Using Shell Script (Linux/Mac)
 
-cloudflared tunnel --url http://localhost:8080
+```bash
+chmod +x start_cluster.sh
+./start_cluster.sh
+```
 
+### Advanced Cluster with Load Balancer
 
+```bash
+python run_cluster.py
+```
+
+This starts multiple API instances on different ports with a built-in round-robin load balancer.
+
+------------------------------------------------------------------------
+
+## Configuration
+
+Edit the `.env` file to configure:
+
+```env
+# Number of worker processes (default: 8)
+WORKERS=8
+
+# Main port for the load balancer
+PORT=8000
+
+# Environment (production enables all workers)
+ENVIRONMENT=development
 ```
 
 ------------------------------------------------------------------------
 
-### 4️⃣ Server Access
+## Verification
 
-``` text
-http://127.0.0.1:8000
+### Check Server Status
+
+```bash
+curl http://localhost:8000/health
 ```
 
-Swagger API Docs:
+**Response:**
+```json
+{"status": "healthy", "version": "1.0.0", "timestamp": "2024-01-01T00:00:00"}
+```
 
-``` text
-http://127.0.0.1:8000/docs
+### Check API Health
+
+```bash
+curl http://localhost:8000/api/v1/misc/health
+```
+
+### Check Active Worker Processes (Windows)
+
+```bash
+tasklist | findstr uvicorn
+```
+
+### Check Active Worker Processes (Linux/Mac)
+
+```bash
+ps aux | grep uvicorn
 ```
 
 ------------------------------------------------------------------------
 
-## 🔁 API Workflow
+## Server Access
 
-1.  Upload Excel file with UAN/ESI numbers
-2.  Upload one or more PDFs
-3.  System auto-detects matching column
-4.  Matching numbers are located inside the PDFs
-5.  Matched rows are highlighted
-6.  Processed PDFs are saved inside `/output` folder
-7.  Live progress can be monitored via API
-
-------------------------------------------------------------------------
-
-## 📂 Output Handling
-
--   If **no destination folder is provided**, output defaults to:
-
-    ``` text
-    /output
-    ```
-
--   Duplicate file names are **automatically renamed**
-
--   Original PDFs are **never overwritten**
+|     Endpoint                         |   Description       |
+|--------------------------------------|---------------------|
+| `http://127.0.0.1:8000`              | Main API            |
+| `http://127.0.0.1:8000/docs`         | Swagger API Docs    |
+| `http://127.0.0.1:8000/redoc`        | ReDoc Documentation |
+| `http://127.0.0.1:8000/openapi.json` | OpenAPI Schema      |
 
 ------------------------------------------------------------------------
 
-## ⏯ Pause & Resume Support
+## API Workflow
 
--   Processing can be paused via API
--   Resume processing without re-uploading files
--   State is maintained globally using `state.py`
-
-------------------------------------------------------------------------
-
-## 🔐 Safety Features
-
--   PDF overwrite protection
--   Invalid file format detection
--   Empty column validation
--   Corrupt PDF auto-skip
--   Fault-tolerant background execution
+1. Upload data file (CSV/Excel) with values to search
+2. Upload one or more documents (PDF/DOCX)
+3. Specify column(s) to use for matching
+4. Select highlight color
+5. Start processing
+6. Monitor progress via API
+7. Download highlighted documents
 
 ------------------------------------------------------------------------
 
-## 📈 Performance Notes
+## Supported File Types
 
--   Optimized for **large PDFs (500+ pages)**
--   Handles **10,000+ UAN matches efficiently**
--   Chunk-based PDF parsing
--   Asynchronous background processing
+| Type       | Extensions        | Purpose                       |
+|------------|-------------------|-------------------------------|
+| Data Files | .csv, .xlsx, .xls | Source of values to highlight |
+| Documents  | .pdf, .docx       | Documents to be highlighted   |
 
-------------------------------------------------------------------------
+## Highlight Colors
 
-## ✅ Requirements
-
--   Python 3.9 or higher
--   Minimum 4GB RAM recommended
--   Windows / Linux / Mac compatible
-
-------------------------------------------------------------------------
-
-## 🧩 Future Enhancements (Optional)
-
--   Web-based dashboard (React / Flutter)
--   Role-based authentication
--   Batch Excel upload
--   OCR for scanned PDFs
--   Cloud storage support (S3 / Azure)
+| Color  | PDF RGB           |        Description          |
+|--------|-------------------|-----------------------------|
+| Yellow | (1.0, 1.0, 0.2)   | Default highlight           |
+| Green  | (0.66, 1.0, 0.33) | Secondary highlight         |
+| Cyan   | (0.4, 1.0, 1.0)   | Tertiary highlight          |
+| Pink   | (1.0, 0.6, 0.86)  | Alternative highlight       |
+| Blue   | (0.6, 0.85, 1.0)  | Alternative highlight       |
+| Red    | (1.0, 0.55, 0.55) | Warning/important highlight |
 
 ------------------------------------------------------------------------
 
-## 👨‍💻 Author
+## Output Handling
 
-Developed for internal payroll & statutory compliance automation.
+- If **no destination folder is provided**, output defaults to:
+  ```
+  /output
+  ```
+- Duplicate file names are **automatically renamed**
+- Original documents are **never overwritten**
+- Processed files have `_1_Highlighted` suffix
 
 ------------------------------------------------------------------------
 
-## 📃 License
+## Job Management
+
+### Job States
+
+| State        | Description                       |
+|--------------|-----------------------------------|
+| `pending`    | Job is queued but not yet started |
+| `processing` | Job is currently being processed  |
+| `completed`  | Job completed successfully        |
+| `failed`     | Job encountered an error          |
+| `paused`     | Job was paused by user            |
+| `cancelled`  | Job was cancelled by user         |
+
+### Operations
+
+- **Pause**: Pause a running job
+- **Resume**: Resume a paused job
+- **Cancel**: Cancel a pending, processing, or paused job
+
+------------------------------------------------------------------------
+
+## Safety Features
+
+- Document overwrite protection
+- Invalid file format detection
+- Empty column validation
+- Corrupt document auto-skip
+- Fault-tolerant background execution
+- Path traversal protection
+
+------------------------------------------------------------------------
+
+## Performance Notes
+
+- Optimized for **large documents (500+ pages)**
+- Handles **10,000+ matches efficiently**
+- Chunk-based document parsing
+- Asynchronous background processing
+- **Multiple workers for horizontal scaling**
+- **In-memory job queue** (Redis available for production)
+
+------------------------------------------------------------------------
+
+## Requirements
+
+- Python 3.9 or higher
+- Minimum 4GB RAM recommended
+- Windows / Linux / Mac compatible
+
+------------------------------------------------------------------------
+
+## API Documentation
+
+See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for detailed API endpoint documentation.
+
+------------------------------------------------------------------------
+
+## Frontend Integration
+
+This backend is designed to work with the Flutter frontend. See `../flutter_frontend/README.md` for frontend setup instructions.
+
+------------------------------------------------------------------------
+
+## License
 
 This project is licensed for **internal organizational use only**.
 
 ------------------------------------------------------------------------
 
-✅ *Fast. Reliable. Automated UAN & ESI PDF Highlighting System.*
+*Fast. Reliable. Automated Document Highlighting System.*

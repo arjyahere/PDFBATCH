@@ -15,7 +15,7 @@ import 'error_handler.dart';
 /// 
 /// Throws an exception if the download fails
 Future<void> downloadFile(String filename, String baseUrl) async {
-  final url = '$baseUrl/download/$filename';
+  final url = '$baseUrl/api/v1/download/$filename';
   
   ErrorHandler.logInfo('Starting IO download: $filename from $baseUrl');
   
@@ -91,7 +91,7 @@ Future<String> downloadFileToDirectory(
   String baseUrl,
   String destinationDir,
 ) async {
-  final url = '$baseUrl/download/$filename';
+  final url = '$baseUrl/api/v1/download/$filename';
   
   ErrorHandler.logInfo('Downloading to directory: $filename to $destinationDir');
   

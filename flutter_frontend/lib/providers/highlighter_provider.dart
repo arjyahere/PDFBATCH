@@ -28,6 +28,7 @@ class HighlighterProvider with ChangeNotifier {
   final bool _ownsClient;
 
   Timer? _pollTimer;
+  Duration _currentPollInterval = AppConfig.progressPollingInterval;
   bool _disposed = false;
 
   /// Creates a new HighlighterProvider
@@ -96,6 +97,9 @@ class HighlighterProvider with ChangeNotifier {
     }
   }
 
+  String? _jobId;
+  String? get jobId => _jobId;
+
   // ============================================================
   // Application State
   // ============================================================
@@ -115,6 +119,11 @@ class HighlighterProvider with ChangeNotifier {
   String? _combinedLogFile;
   String? _unmatchedValuesFile;
   String? _destFolder;
+  List<Map<String, dynamic>> _outputFiles = [];
+
+  // Large file warning state
+  int _estimatedProcessingSeconds = 0;
+  bool _isLargeFile = false;
 
   /// Available highlight color options
   final List<String> colorOptions = [
@@ -145,6 +154,22 @@ class HighlighterProvider with ChangeNotifier {
   String? get combinedLogFile => _combinedLogFile;
   String? get unmatchedValuesFile => _unmatchedValuesFile;
   String? get destFolder => _destFolder;
+  List<Map<String, dynamic>> get outputFiles => List.unmodifiable(_outputFiles);
+
+  int get estimatedProcessingSeconds => _estimatedProcessingSeconds;
+  bool get isLargeFile => _isLargeFile;
+
+  /// Get a human-readable estimate message
+  String getLargeFileWarningMessage() {
+    if (!_isLargeFile) return '';
+    
+    if (_estimatedProcessingSeconds >= 60) {
+      final minutes = (_estimatedProcessingSeconds / 60).round();
+      return 'Large file detected. Estimated processing time: ~$minutes minute${minutes > 1 ? 's' : ''}. Please be patient.';
+    } else {
+      return 'Large file detected. Estimated processing time: ~$_estimatedProcessingSeconds seconds.';
+    }
+  }
 
   // ============================================================
   // Setters
@@ -186,6 +211,35 @@ class HighlighterProvider with ChangeNotifier {
     _selectedColumns.clear();
     ErrorHandler.logInfo('All columns cleared');
     notifyListeners();
+  }
+
+  // ============================================================
+  // Large File Detection
+  // ============================================================
+
+  /// Calculate estimated processing time based on file characteristics
+  /// 
+  /// Factors considered:
+  /// - Total document file size (larger files take longer)
+  /// - Number of documents (more documents = more processing)
+  void calculateEstimatedTime() {
+    // Calculate total document size in MB
+    final int totalSizeBytes = _documentFiles.fold<int>(0, (sum, f) => sum + (f.size));
+    final double totalSizeMB = totalSizeBytes / (1024 * 1024);
+    
+    // Estimate based on observed data from real processing:
+    // - ~100 seconds per MB of PDF (observed: 5.84MB took ~570s = ~97s/MB)
+    final double estimatedSeconds = totalSizeMB * 100.0;
+    
+    _estimatedProcessingSeconds = estimatedSeconds.round();
+    
+    // Consider "large" if estimated time > 15 seconds OR file size > 5MB
+    _isLargeFile = _estimatedProcessingSeconds > 15 || totalSizeMB > 5.0;
+    
+    ErrorHandler.logInfo(
+      'Large file detection: ${_estimatedProcessingSeconds}s estimated, '
+      '${totalSizeMB.toStringAsFixed(2)}MB, isLargeFile=$_isLargeFile'
+    );
   }
 
   /// Set the highlight color
@@ -299,7 +353,7 @@ class HighlighterProvider with ChangeNotifier {
 
     try {
       await _safeRequest((url) async {
-        final uri = Uri.parse('$url/load-columns');
+        final uri = Uri.parse('$url/api/v1/misc/load-columns');
         final request = http.MultipartRequest('POST', uri);
 
         await _addPlatformFileToRequest(request, 'file', _dataFile!);
@@ -354,11 +408,14 @@ class HighlighterProvider with ChangeNotifier {
 
     ErrorHandler.logInfo('Starting process with ${_documentFiles.length} documents');
 
+    // Calculate estimated processing time before starting
+    calculateEstimatedTime();
+
     try {
       await _safeRequest((url) async {
         final request = http.MultipartRequest(
           'POST',
-          Uri.parse('$url/process'),
+          Uri.parse('$url/api/v1/process'),
         );
 
         await _addPlatformFileToRequest(request, 'data_file', _dataFile!);
@@ -380,7 +437,11 @@ class HighlighterProvider with ChangeNotifier {
         final data = await streamed.stream.bytesToString();
         final jsonResponse = json.decode(data) as Map<String, dynamic>;
 
-        if (streamed.statusCode != 200) {
+        if (streamed.statusCode == 200) {
+          // Store job_id from response
+          _jobId = jsonResponse['job_id']?.toString();
+          ErrorHandler.logInfo('Process started with job_id: $_jobId');
+        } else {
           final error = jsonResponse['error'];
           if (error is Map<String, dynamic>) {
             throw Exception(json.encode(error));
@@ -405,14 +466,46 @@ class HighlighterProvider with ChangeNotifier {
   // Progress Polling
   // ============================================================
   
-  /// Start polling for progress updates
+  // Adaptive polling intervals based on progress
+  static const Duration _fastPollingInterval = Duration(seconds: 20);
+  static const Duration _mediumPollingInterval = Duration(seconds: 40);
+  static const Duration _slowPollingInterval = Duration(seconds: 60);
+  static const double _mediumThreshold = 70.0; // Switch to medium at 50%
+  static const double _slowThreshold = 90.0; // Switch to slow at 80%
+
+  /// Start polling for progress updates with adaptive intervals
   void _startPolling({Duration? interval}) {
     _pollTimer?.cancel();
+    _currentPollInterval = interval ?? _fastPollingInterval; // Start with fast interval
     _pollTimer = Timer.periodic(
-      interval ?? AppConfig.progressPollingInterval,
+      _currentPollInterval,
       (_) => _fetchProgress(),
     );
-    ErrorHandler.logInfo('Progress polling started');
+    ErrorHandler.logInfo('Progress polling started with ${_currentPollInterval.inSeconds}s interval');
+  }
+
+  /// Calculate adaptive polling interval based on current progress
+  Duration _getAdaptiveInterval(double progress) {
+    if (progress >= _slowThreshold) {
+      return _slowPollingInterval;
+    } else if (progress >= _mediumThreshold) {
+      return _mediumPollingInterval;
+    }
+    return _fastPollingInterval;
+  }
+
+  /// Update polling timer with new interval if needed
+  void _updatePollingInterval(double progress) {
+    final newInterval = _getAdaptiveInterval(progress);
+    if (newInterval != _currentPollInterval && _pollTimer != null && _pollTimer!.isActive) {
+      _currentPollInterval = newInterval;
+      _pollTimer?.cancel();
+      _pollTimer = Timer.periodic(
+        _currentPollInterval,
+        (_) => _fetchProgress(),
+      );
+      ErrorHandler.logInfo('Progress polling interval adjusted to ${newInterval.inSeconds}s at ${progress.toStringAsFixed(0)}%');
+    }
   }
 
   /// Fetch current progress from the server
@@ -421,8 +514,13 @@ class HighlighterProvider with ChangeNotifier {
 
     try {
       await _safeRequest((url) async {
+        // Build URL with job_id for concurrent job support
+        final progressUrl = _jobId != null 
+            ? '$url/api/v1/progress?job_id=$_jobId&limit_logs=0'
+            : '$url/api/v1/progress?limit_logs=0';
+        
         final resp = await _client
-            .get(Uri.parse('$url/progress'))
+            .get(Uri.parse(progressUrl))
             .timeout(const Duration(seconds: 10));
 
         if (resp.statusCode == 200) {
@@ -436,13 +534,25 @@ class HighlighterProvider with ChangeNotifier {
             (data['logs'] as List<dynamic>?) ?? [],
           );
           _combinedLogFile = data['combined_log']?.toString();
-          _unmatchedValuesFile = data['unmatched_values']?.toString();
+          _unmatchedValuesFile = data['not_found_report']?.toString();
+          _outputFiles = List<Map<String, dynamic>>.from(
+            (data['output_files'] as List<dynamic>?) ?? [],
+          );
 
-          if (_progress >= 100.0) {
+          // Check for completion via progress >= 100 or completed flag
+          final isCompleted = data['completed'] == true || _progress >= 100.0;
+          final statusLower = _status.toLowerCase();
+          final isStatusComplete = statusLower.contains('complete') || statusLower.contains('done');
+          
+          if (isCompleted || isStatusComplete) {
             _isProcessing = false;
+            _progress = 100.0;
             _status = 'Completed';
             _pollTimer?.cancel();
             ErrorHandler.logInfo('Processing completed');
+          } else {
+            // Adjust polling interval based on current progress
+            _updatePollingInterval(_progress);
           }
 
           notifyListeners();
@@ -451,8 +561,8 @@ class HighlighterProvider with ChangeNotifier {
         }
       });
     } catch (e) {
-      _status = 'Connection issue... switching server';
-      ErrorHandler.logError('Progress fetch failed', error: e);
+      _status = 'Reconnecting...';
+      ErrorHandler.logError('Progress fetch failed, retrying...', error: e);
       notifyListeners();
     }
   }
@@ -463,9 +573,11 @@ class HighlighterProvider with ChangeNotifier {
   
   /// Pause the current process
   Future<String?> pauseProcess() async {
+    if (_jobId == null) return 'No active job to pause';
+    
     try {
       await _safeRequest(
-        (url) => _client.post(Uri.parse('$url/pause')),
+        (url) => _client.post(Uri.parse('$url/api/v1/process/$_jobId/pause')),
       );
       _status = 'Paused';
       ErrorHandler.logInfo('Process paused');
@@ -479,9 +591,11 @@ class HighlighterProvider with ChangeNotifier {
 
   /// Resume a paused process
   Future<String?> resumeProcess() async {
+    if (_jobId == null) return 'No active job to resume';
+    
     try {
       await _safeRequest(
-        (url) => _client.post(Uri.parse('$url/resume')),
+        (url) => _client.post(Uri.parse('$url/api/v1/process/$_jobId/resume')),
       );
       _status = 'Resumed';
       _startPolling();
@@ -496,11 +610,14 @@ class HighlighterProvider with ChangeNotifier {
 
   /// Stop the current process
   Future<String?> stopProcess() async {
+    if (_jobId == null) return 'No active job to stop';
+    
     try {
       await _safeRequest(
-        (url) => _client.post(Uri.parse('$url/stop')),
+        (url) => _client.post(Uri.parse('$url/api/v1/process/$_jobId/cancel')),
       );
       _isProcessing = false;
+      _jobId = null;
       _status = 'Stopped';
       _pollTimer?.cancel();
       ErrorHandler.logInfo('Process stopped');
@@ -516,30 +633,36 @@ class HighlighterProvider with ChangeNotifier {
   // Batch Downloads
   // ============================================================
   
-  /// Sanitize a filename for safe file system operations
-  String _safeFilename(String s) {
-    return s.replaceAll(RegExp(r'[^a-zA-Z0-9 _\-\(\)]'), '');
-  }
-
-  /// Download all processed PDFs
+  /// Download all processed files (PDFs and CSVs) from output folder
   Future<String?> downloadProcessedPdfs() async {
-    if (_documentFiles.isEmpty) return 'No documents to download';
+    if (_outputFiles.isEmpty) return 'No output files available';
 
-    ErrorHandler.logInfo('Downloading ${_documentFiles.length} processed documents');
+    ErrorHandler.logInfo('Downloading ${_outputFiles.length} output files');
 
     try {
-      for (int idx = 0; idx < _documentFiles.length; idx++) {
-        final doc = _documentFiles[idx];
-        final ext = doc.name.split('.').last;
-        final base = doc.name.replaceAll('.$ext', '');
-        final safeBase = _safeFilename(base);
-        final processedName = '${safeBase}_${idx + 1}_Highlighted.$ext';
-
-        await downloader.downloadFile(processedName, baseUrl);
+      int downloaded = 0;
+      int errors = 0;
+      
+      for (final file in _outputFiles) {
+        final fileName = file['name']?.toString();
+        if (fileName == null || fileName.isEmpty) continue;
+        
+        try {
+          await downloader.downloadFile(fileName, baseUrl);
+          downloaded++;
+        } catch (e) {
+          ErrorHandler.logError('Failed to download $fileName', error: e);
+          errors++;
+        }
       }
+      
+      if (errors > 0) {
+        return 'Some files failed to download ($errors errors out of ${_outputFiles.length})';
+      }
+      ErrorHandler.logInfo('Downloaded $downloaded files successfully');
       return null;
     } catch (e) {
-      ErrorHandler.logError('Download processed PDFs failed', error: e);
+      ErrorHandler.logError('Download failed', error: e);
       return 'Download error: $e';
     }
   }
@@ -588,6 +711,10 @@ class HighlighterProvider with ChangeNotifier {
     _combinedLogFile = null;
     _unmatchedValuesFile = null;
     _destFolder = null;
+    _jobId = null;
+    _outputFiles.clear();
+    _estimatedProcessingSeconds = 0;
+    _isLargeFile = false;
 
     _pollTimer?.cancel();
     ErrorHandler.logInfo('Provider state reset');
@@ -614,3 +741,4 @@ class HighlighterProvider with ChangeNotifier {
     super.dispose();
   }
 }
+

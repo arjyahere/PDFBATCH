@@ -6,7 +6,7 @@ A professional PDF and DOCX batch highlighting application built with Flutter. T
 
 - **Multi-platform Support**: Web, Windows, macOS, Linux, iOS, and Android
 - **File Selection**: Upload CSV/Excel data files and PDF/DOCX documents
-- **Column Selection**: Choose which columns contain values to search for
+- **Column Selection**: Choose which columns contain values to search for (1 or 2 columns)
 - **Color Selection**: Multiple highlight colors (Yellow, Green, Cyan, Pink, Blue, Red)
 - **Progress Monitoring**: Real-time progress tracking with polling
 - **Process Control**: Start, pause, resume, and stop processing
@@ -20,7 +20,7 @@ A professional PDF and DOCX batch highlighting application built with Flutter. T
 
 - Flutter SDK 3.8.1 or higher
 - Dart SDK
-- Backend API server running
+- Backend API server running (see [API Documentation](batch_highlighter_api_integrated/API_DOCUMENTATION.md))
 
 ### Installation
 
@@ -120,7 +120,7 @@ The app uses Provider for state management with a single `HighlighterProvider` t
 
 ### API Communication
 - HTTP multipart requests for file uploads
-- Polling-based progress tracking
+- Polling-based progress tracking (1-second interval)
 - Automatic server failover on connection errors
 - Timeout handling for all requests
 
@@ -131,13 +131,22 @@ The app uses Provider for state management with a single `HighlighterProvider` t
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `BASE_URLS` | Comma-separated API server URLs | `http://127.0.0.1:8000` |
-| `API_VERSION` | API version prefix | `v1` |
-| `API_KEY` | Optional API authentication key | - |
-| `API_SECRET` | Optional API authentication secret | - |
-| `ENVIRONMENT` | Environment identifier (DEV/PROD/STAGING) | `DEV` |
+|  Variable      |       Description                         |      Default            |
+|----------------|-------------------------------------------|-------------------------|
+| `BASE_URLS`    | Comma-separated API server URLs           | `http://127.0.0.1:8000` |
+| `API_VERSION`  | API version prefix                        |          `v1`           |
+| `API_KEY`      | Optional API authentication key           |           -             |
+| `API_SECRET`   | Optional API authentication secret        |           -             |
+| `ENVIRONMENT`  | Environment identifier (DEV/PROD/STAGING) |          `DEV`          |
+
+### Timeout Configuration
+
+| Timeout Type    |    Duration |       Purpose         |
+|-----------------|-------------|-----------------------|
+| Default         | 30 seconds  | Standard API requests |
+| Upload          | 120 seconds | Large file uploads    |
+| Download        | 60 seconds  | File downloads        |
+| Polling         | 1 second    | Progress updates      |
 
 ## Security Considerations
 
@@ -146,6 +155,7 @@ The app uses Provider for state management with a single `HighlighterProvider` t
 - Filename sanitization before saving
 - Path traversal protection
 - No sensitive data in logs
+- CORS support for web deployment
 
 ## Testing
 
@@ -176,6 +186,7 @@ flutter build <platform> --release
 ```
 
 ### Mobile
+
 ```bash
 # Android APK
 flutter build apk --release
@@ -195,11 +206,40 @@ flutter build ios --release
 2. **File picker not working**: Check platform-specific permissions
 3. **Downloads failing**: Verify the backend download endpoint is accessible
 4. **Server unreachable**: Check BASE_URLS configuration and network connectivity
+5. **Highlighting not found**: Ensure column names match exactly between data and selection
 
 ### Debug Mode
+
 Run with verbose logging:
 ```bash
 flutter run --verbose
+```
+
+## API Integration
+
+### Endpoints Used
+
+| Operation      | Method |       Endpoint                    |
+|----------------|--------|-----------------------------------|
+| Health Check   | GET    | `/api/v1/misc/health`             |
+| Load Columns   | POST   | `/api/v1/misc/load-columns`       |
+| Start Process  | POST   | `/api/v1/process`                 |
+| Get Progress   | GET    | `/api/v1/progress`                |
+| Pause Job      | POST   | `/api/v1/process/{job_id}/pause`  |
+| Resume Job     | POST   | `/api/v1/process/{job_id}/resume` |
+| Cancel Job     | POST   | `/api/v1/process/{job_id}/cancel` |
+| List Jobs      | GET    | `/api/v1/process`                 |
+| Get Job Status | GET    | `/api/v1/process/{job_id}`        |
+| List Files     | GET    | `/api/v1/download/list`           | 
+| Download File  | GET    | `/api/v1/download/{filename}`     |
+
+### Error Response Format
+
+```json
+{
+  "code": "ERROR_CODE",
+  "message": "Human readable message"
+}
 ```
 
 ## Contributing
@@ -209,6 +249,28 @@ flutter run --verbose
 3. Make your changes
 4. Run tests and analysis
 5. Submit a pull request
+
+## Backend Setup
+
+See [API Documentation](batch_highlighter_api_integrated/API_DOCUMENTATION.md) for backend setup instructions.
+
+### Quick Start (Backend)
+
+```bash
+cd batch_highlighter_api_integrated
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# or
+.venv\Scripts\activate  # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the server
+python main.py
+```
 
 ## License
 
