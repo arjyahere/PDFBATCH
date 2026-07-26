@@ -201,17 +201,16 @@ python run_cluster.py --workers 4
 
 ### Start Background Workers Only
 ```bash
-cd batch_highlighter_api_integrated
-# On Windows
-start_cluster.bat
+# On Windows (from repo root)
+Scripts\start_cluster.bat
 # On Linux/macOS
-bash start_cluster.sh
+bash Scripts/start_cluster.sh
 ```
 
 ### Clear Memory (Input/Output Folders)
 ```bash
 # On Windows - Double-click or run:
-clean_memory.bat
+Scripts\clean_memory.bat
 ```
 
 ---

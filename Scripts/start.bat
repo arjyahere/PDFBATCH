@@ -5,10 +5,13 @@ title Full Stack Launcher (Flutter + FastAPI)
 color 0A
 
 :: =========================================================
-:: CONFIG
+:: CONFIG - resolve repo root from this script's location
 :: =========================================================
-set "FRONTEND_PATH=C:\PROJECT_WORK\PFD\V3-1\flutter_frontend\build\web"
-set "BACKEND_PATH=C:\PROJECT_WORK\PFD\V3-1\batch_highlighter_api_integrated"
+cd /d "%~dp0.."
+set "ROOT=%CD%"
+
+set "FRONTEND_PATH=%ROOT%\flutter_frontend\build\web"
+set "BACKEND_PATH=%ROOT%\batch_highlighter_api_integrated"
 
 set "FRONTEND_PORT=8001"
 set "API_PORT=8000"

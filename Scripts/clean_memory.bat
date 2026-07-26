@@ -1,10 +1,14 @@
 @echo off
-REM Clear Memory Batch Script
-REM This script clears all files from input and output folders
+setlocal
+REM Clear input and output folders of the backend (not the folder this script runs from)
+
+cd /d "%~dp0..\batch_highlighter_api_integrated"
+set "BACKEND_PATH=%CD%"
 
 echo ========================================
 echo    Clearing Input and Output Folders
 echo ========================================
+echo Target: %BACKEND_PATH%
 echo.
 
 REM Clear input folder

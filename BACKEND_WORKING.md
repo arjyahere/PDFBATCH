@@ -921,8 +921,8 @@ LOGGING__BACKUP_COUNT=5
 
 ### Startup Scripts
 
-- **Windows**: [`start_cluster.bat`](batch_highlighter_api_integrated/start_cluster.bat) - Starts Redis, workers, and API server
-- **Linux/macOS**: [`start_cluster.sh`](batch_highlighter_api_integrated/start_cluster.sh) - Starts Redis, workers, and API server
+- **Windows**: [`start_cluster.bat`](Scripts/start_cluster.bat) - Starts workers and API server
+- **Linux/macOS**: [`start_cluster.sh`](Scripts/start_cluster.sh) - Starts workers and API server
 
 ### Manual Startup (Development Mode)
 
@@ -951,7 +951,7 @@ For distributed processing:
 python run_cluster.py
 
 # Clear memory and temporary files
-clean_memory.bat  # Windows
+Scripts/clean_memory.bat  # Windows
 # or
 rm -rf temp/  # Linux/macOS
 ```
@@ -1009,7 +1009,7 @@ Pending → Cancelled
 
 ### Memory Management
 
-Use [`clean_memory.bat`](batch_highlighter_api_integrated/clean_memory.bat) to clear temporary files and memory.
+Use [`clean_memory.bat`](Scripts/clean_memory.bat) to clear temporary files and memory.
 
 ## API Documentation
 

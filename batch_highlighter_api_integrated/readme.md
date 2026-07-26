@@ -106,8 +106,6 @@ project_root/
 ├── .env                                 # Environment variables
 ├── requirements.txt                     # Python dependencies
 ├── run_cluster.py                       # Advanced cluster manager with load balancer
-├── start_cluster.bat                    # Windows startup script
-├── start_cluster.sh                     # Linux/Mac startup script
 ├── main.py                              # Main application entry
 ├── API_DOCUMENTATION.md                 # API documentation
 └── README.md                            # Project documentation
@@ -165,15 +163,17 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 8
 
 ### Using Batch Script (Windows)
 
+Run from the repo root (the script changes into this folder itself):
+
 ```bash
-start_cluster.bat
+Scripts\start_cluster.bat
 ```
 
 ### Using Shell Script (Linux/Mac)
 
 ```bash
-chmod +x start_cluster.sh
-./start_cluster.sh
+chmod +x Scripts/start_cluster.sh
+bash Scripts/start_cluster.sh
 ```
 
 ### Advanced Cluster with Load Balancer
