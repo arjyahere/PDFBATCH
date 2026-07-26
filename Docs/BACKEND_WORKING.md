@@ -71,7 +71,7 @@ batch_highlighter_api_integrated/
 
 ## System Architecture
 
-### 1. Entry Point - [`main.py`](batch_highlighter_api_integrated/main.py:1)
+### 1. Entry Point - [`main.py`](../batch_highlighter_api_integrated/main.py:1)
 
 The application starts with `main.py`, which initializes the FastAPI application with production-ready settings:
 
@@ -104,7 +104,7 @@ def main():
     uvicorn.run("main:app", **uvicorn_config)
 ```
 
-**Application Creation - [`api.py`](batch_highlighter_api_integrated/app/api.py:1):**
+**Application Creation - [`api.py`](../batch_highlighter_api_integrated/app/api.py:1):**
 ```python
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -151,7 +151,7 @@ def create_app() -> FastAPI:
 
 ### 2. API Layer - routers/
 
-#### Process Router - [`process_router.py`](batch_highlighter_api_integrated/app/routers/process_router.py:1)
+#### Process Router - [`process_router.py`](../batch_highlighter_api_integrated/app/routers/process_router.py:1)
 
 Handles file processing requests with full job lifecycle management:
 
@@ -201,7 +201,7 @@ async def process_files():
     )
 ```
 
-#### Progress Router - [`progress_router.py`](batch_highlighter_api_integrated/app/routers/progress_router.py:1)
+#### Progress Router - [`progress_router.py`](../batch_highlighter_api_integrated/app/routers/progress_router.py:1)
 
 Provides job progress and log retrieval:
 
@@ -242,7 +242,7 @@ class ProcessingStatus:
 - Log retrieval with pagination
 - Real-time progress tracking via periodic polling
 
-#### Miscellaneous Router - [`misc_router.py`](batch_highlighter_api_integrated/app/routers/misc_router.py:1)
+#### Miscellaneous Router - [`misc_router.py`](../batch_highlighter_api_integrated/app/routers/misc_router.py:1)
 
 Provides utility endpoints:
 
@@ -265,7 +265,7 @@ async def load_columns(file: UploadFile = File(...)):
     return {"columns": list(df.columns)}
 ```
 
-#### Download Router - [`download_router.py`](batch_highlighter_api_integrated/app/routers/download_router.py:1)
+#### Download Router - [`download_router.py`](../batch_highlighter_api_integrated/app/routers/download_router.py:1)
 
 Handles file download requests with secure file access:
 
@@ -285,7 +285,7 @@ Handles file download requests with secure file access:
 
 ### 3. Business Logic Layer - services/
 
-#### Job Queue - [`job_queue.py`](batch_highlighter_api_integrated/app/services/job_queue.py:1)
+#### Job Queue - [`job_queue.py`](../batch_highlighter_api_integrated/app/services/job_queue.py:1)
 
 Manages job queue operations with support for multiple backends:
 
@@ -327,7 +327,7 @@ def get_job_queue() -> JobQueue:
         return FairJobQueue()  # For better worker distribution
 ```
 
-#### Queue Worker - [`queue_worker.py`](batch_highlighter_api_integrated/app/services/queue_worker.py:1)
+#### Queue Worker - [`queue_worker.py`](../batch_highlighter_api_integrated/app/services/queue_worker.py:1)
 
 Background worker that processes jobs from the queue:
 
@@ -412,7 +412,7 @@ class QueueWorker:
         }
 ```
 
-#### Worker - [`worker.py`](batch_highlighter_api_integrated/app/services/worker.py:1)
+#### Worker - [`worker.py`](../batch_highlighter_api_integrated/app/services/worker.py:1)
 
 Handles the actual file processing:
 
@@ -433,7 +433,7 @@ class Worker:
 
 #### Highlighting Engines
 
-##### PDF Highlighter - [`pdf_highlighter.py`](batch_highlighter_api_integrated/app/services/pdf_highlighter.py:1)
+##### PDF Highlighter - [`pdf_highlighter.py`](../batch_highlighter_api_integrated/app/services/pdf_highlighter.py:1)
 
 Main service that coordinates PDF highlighting:
 
@@ -446,7 +446,7 @@ class PDFHighlighter:
         pass
 ```
 
-##### Single Column Engine - [`single_column_engine.py`](batch_highlighter_api_integrated/app/services/single_column_engine.py:1)
+##### Single Column Engine - [`single_column_engine.py`](../batch_highlighter_api_integrated/app/services/single_column_engine.py:1)
 
 Handles PDF files with single-column layouts:
 
@@ -461,7 +461,7 @@ class SingleColumnEngine:
         pass
 ```
 
-##### Multi Column Engine - [`multi_column_engine.py`](batch_highlighter_api_integrated/app/services/multi_column_engine.py:1)
+##### Multi Column Engine - [`multi_column_engine.py`](../batch_highlighter_api_integrated/app/services/multi_column_engine.py:1)
 
 Advanced engine for multi-column PDF layouts with complex table detection:
 
@@ -484,7 +484,7 @@ class MultiColumnEngine:
         pass
 ```
 
-##### PDF Highlighter Decider - [`pdf_highlighter_decider.py`](batch_highlighter_api_integrated/app/services/pdf_highlighter_decider.py:1)
+##### PDF Highlighter Decider - [`pdf_highlighter_decider.py`](../batch_highlighter_api_integrated/app/services/pdf_highlighter_decider.py:1)
 
 Intelligent routing to appropriate highlighting engine:
 
@@ -501,7 +501,7 @@ class PDFHighlighterDecider:
         pass
 ```
 
-##### DOCX Highlighter - [`docx_highlighter.py`](batch_highlighter_api_integrated/app/services/docx_highlighter.py:1)
+##### DOCX Highlighter - [`docx_highlighter.py`](../batch_highlighter_api_integrated/app/services/docx_highlighter.py:1)
 
 Handles DOCX file highlighting:
 
@@ -518,7 +518,7 @@ class DocxHighlighter:
 
 ### 4. Core System Components - core/
 
-#### Configuration - [`config.py`](batch_highlighter_api_integrated/app/core/config.py:1)
+#### Configuration - [`config.py`](../batch_highlighter_api_integrated/app/core/config.py:1)
 
 Manages application configuration:
 
@@ -531,7 +531,7 @@ class Settings:
     # Processing engine settings
 ```
 
-#### State Management - [`state.py`](batch_highlighter_api_integrated/app/core/state.py:1)
+#### State Management - [`state.py`](../batch_highlighter_api_integrated/app/core/state.py:1)
 
 Manages application state with support for concurrent job processing:
 
@@ -579,7 +579,7 @@ COLOR_PRESETS = {
 }
 ```
 
-#### Exceptions - [`exceptions.py`](batch_highlighter_api_integrated/app/core/exceptions.py:1)
+#### Exceptions - [`exceptions.py`](../batch_highlighter_api_integrated/app/core/exceptions.py:1)
 
 Custom exception classes:
 
@@ -594,7 +594,7 @@ class JobNotFoundException(ProcessingException):
     # Job not found error
 ```
 
-#### Error Codes - [`error_codes.py`](batch_highlighter_api_integrated/app/core/error_codes.py:1)
+#### Error Codes - [`error_codes.py`](../batch_highlighter_api_integrated/app/core/error_codes.py:1)
 
 Standardized error code definitions:
 
@@ -614,7 +614,7 @@ class ErrorCode:
 
 ### 5. Data Access Layer - repositories/
 
-#### Job Repository - [`job_repository.py`](batch_highlighter_api_integrated/app/repositories/job_repository.py:1)
+#### Job Repository - [`job_repository.py`](../batch_highlighter_api_integrated/app/repositories/job_repository.py:1)
 
 Manages job persistence:
 
@@ -635,7 +635,7 @@ class JobRepository:
 
 ### 6. Dependency Injection - dependencies/
 
-#### Service Factory - [`service_factory.py`](batch_highlighter_api_integrated/app/dependencies/service_factory.py:1)
+#### Service Factory - [`service_factory.py`](../batch_highlighter_api_integrated/app/dependencies/service_factory.py:1)
 
 Provides service instances:
 
@@ -740,7 +740,7 @@ The system automatically detects:
 
 ## Request/Response Schemas - schemas/
 
-#### Process Schemas - [`process_schemas.py`](batch_highlighter_api_integrated/app/schemas/process_schemas.py:1)
+#### Process Schemas - [`process_schemas.py`](../batch_highlighter_api_integrated/app/schemas/process_schemas.py:1)
 
 Pydantic models for request/response validation:
 
@@ -826,7 +826,7 @@ class ProcessingLog(BaseModel):
 
 ## Configuration
 
-The application uses a nested settings structure from [`settings.py`](batch_highlighter_api_integrated/app/config/settings.py:1):
+The application uses a nested settings structure from [`settings.py`](../batch_highlighter_api_integrated/app/config/settings.py:1):
 
 ```python
 class Settings:
@@ -921,8 +921,8 @@ LOGGING__BACKUP_COUNT=5
 
 ### Startup Scripts
 
-- **Windows**: [`start_cluster.bat`](Scripts/start_cluster.bat) - Starts workers and API server
-- **Linux/macOS**: [`start_cluster.sh`](Scripts/start_cluster.sh) - Starts workers and API server
+- **Windows**: [`start_cluster.bat`](../Scripts/start_cluster.bat) - Starts workers and API server
+- **Linux/macOS**: [`start_cluster.sh`](../Scripts/start_cluster.sh) - Starts workers and API server
 
 ### Manual Startup (Development Mode)
 
@@ -960,7 +960,7 @@ rm -rf temp/  # Linux/macOS
 
 ### Logging
 
-Logs are stored in [`logs/app.log`](batch_highlighter_api_integrated/logs/app.log) with levels:
+Logs are stored in [`logs/app.log`](../batch_highlighter_api_integrated/logs/app.log) with levels:
 - INFO: Normal operation
 - WARNING: Potential issues
 - ERROR: Error conditions
@@ -993,7 +993,7 @@ curl -X GET http://localhost:8000/api/v1/progress/{job_id}/details
 
 #### Metrics and Logs
 
-- **Application Logs**: [`logs/app.log`](batch_highlighter_api_integrated/logs/app.log)
+- **Application Logs**: [`logs/app.log`](../batch_highlighter_api_integrated/logs/app.log)
 - **Worker Logs**: Separate log files per worker
 - **Metrics**: Available via `/api/v1/metrics` endpoint (if enabled)
 
@@ -1009,7 +1009,7 @@ Pending → Cancelled
 
 ### Memory Management
 
-Use [`clean_memory.bat`](Scripts/clean_memory.bat) to clear temporary files and memory.
+Use [`clean_memory.bat`](../Scripts/clean_memory.bat) to clear temporary files and memory.
 
 ## API Documentation
 
@@ -1017,11 +1017,11 @@ Full API documentation is available at:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
-See [`API_DOCUMENTATION.md`](batch_highlighter_api_integrated/API_DOCUMENTATION.md) for detailed API reference.
+See [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md) for detailed API reference.
 
 ## Data Access Layer - repositories/
 
-#### Job Repository - [`job_repository.py`](batch_highlighter_api_integrated/app/repositories/job_repository.py:1)
+#### Job Repository - [`job_repository.py`](../batch_highlighter_api_integrated/app/repositories/job_repository.py:1)
 
 Manages job persistence with support for multiple storage backends:
 
@@ -1050,7 +1050,7 @@ class Job:
 - File-based storage (JSON files)
 - Database storage (SQLite/Redis)
 
-#### Worker - [`worker.py`](batch_highlighter_api_integrated/app/services/worker.py:1)
+#### Worker - [`worker.py`](../batch_highlighter_api_integrated/app/services/worker.py:1)
 
 Background worker for direct file processing (legacy API support):
 
@@ -1078,7 +1078,7 @@ class ProcessingWorker:
 
 ## Dependency Injection - dependencies/
 
-#### Service Factory - [`service_factory.py`](batch_highlighter_api_integrated/app/dependencies/service_factory.py:1)
+#### Service Factory - [`service_factory.py`](../batch_highlighter_api_integrated/app/dependencies/service_factory.py:1)
 
 Provides dependency injection using protocols for loose coupling:
 
@@ -1122,7 +1122,7 @@ class ServiceFactory:
 
 ## Error Handling - core/
 
-### Custom Exceptions - [`exceptions.py`](batch_highlighter_api_integrated/app/core/exceptions.py:1)
+### Custom Exceptions - [`exceptions.py`](../batch_highlighter_api_integrated/app/core/exceptions.py:1)
 
 Custom exception hierarchy for structured error handling:
 
@@ -1154,7 +1154,7 @@ class ConfigurationException(AppException):
     """Exception for configuration errors."""
 ```
 
-### Error Codes - [`error_codes.py`](batch_highlighter_api_integrated/app/core/error_codes.py:1)
+### Error Codes - [`error_codes.py`](../batch_highlighter_api_integrated/app/core/error_codes.py:1)
 
 Standardized error codes with categories and descriptions:
 
@@ -1179,7 +1179,7 @@ ERROR_CODES = {
 }
 ```
 
-### Exception Handlers - [`exception_handlers.py`](batch_highlighter_api_integrated/app/core/exception_handlers.py:1)
+### Exception Handlers - [`exception_handlers.py`](../batch_highlighter_api_integrated/app/core/exception_handlers.py:1)
 
 Global exception handlers for consistent error responses:
 

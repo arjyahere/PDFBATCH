@@ -107,8 +107,9 @@ project_root/
 ├── requirements.txt                     # Python dependencies
 ├── run_cluster.py                       # Advanced cluster manager with load balancer
 ├── main.py                              # Main application entry
-├── API_DOCUMENTATION.md                 # API documentation
-└── README.md                            # Project documentation
+└── readme.md                            # Project documentation
+
+API docs live in `../Docs/API_DOCUMENTATION.md`.
 ```
 
 ------------------------------------------------------------------------
@@ -344,7 +345,7 @@ ps aux | grep uvicorn
 
 ## API Documentation
 
-See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for detailed API endpoint documentation.
+See [API_DOCUMENTATION.md](../Docs/API_DOCUMENTATION.md) for detailed API endpoint documentation.
 
 ------------------------------------------------------------------------
 

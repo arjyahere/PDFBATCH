@@ -17,7 +17,7 @@ Streamline manual document review processes by:
 
 ### System Architecture
 
-#### Backend ([`batch_highlighter_api_integrated/`](batch_highlighter_api_integrated/))
+#### Backend ([`batch_highlighter_api_integrated/`](../batch_highlighter_api_integrated/))
 - **Framework**: FastAPI (Python)
 - **Key Components**:
   - **API Endpoints**: Handle file uploads, processing commands, and progress tracking
@@ -26,7 +26,7 @@ Streamline manual document review processes by:
   - **Job Queue**: Background task processing with pause/resume/cancel support
   - **Progress Tracking**: Real-time status updates for each document
 
-#### Frontend ([`flutter_frontend/`](flutter_frontend/))
+#### Frontend ([`flutter_frontend/`](../flutter_frontend/))
 - **Framework**: Flutter (Dart) - cross-platform support
 - **Key Features**:
   - File selection and upload interface

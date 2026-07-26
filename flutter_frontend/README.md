@@ -20,7 +20,7 @@ A professional PDF and DOCX batch highlighting application built with Flutter. T
 
 - Flutter SDK 3.8.1 or higher
 - Dart SDK
-- Backend API server running (see [API Documentation](batch_highlighter_api_integrated/API_DOCUMENTATION.md))
+- Backend API server running (see [API Documentation](../Docs/API_DOCUMENTATION.md))
 
 ### Installation
 
@@ -252,7 +252,7 @@ flutter run --verbose
 
 ## Backend Setup
 
-See [API Documentation](batch_highlighter_api_integrated/API_DOCUMENTATION.md) for backend setup instructions.
+See [API Documentation](../Docs/API_DOCUMENTATION.md) for backend setup instructions.
 
 ### Quick Start (Backend)
 

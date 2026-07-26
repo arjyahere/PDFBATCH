@@ -14,17 +14,17 @@ The Batch Document Highlighter is an asynchronous document processing system tha
 
 ## Architecture Components
 
-### Backend Components ([`batch_highlighter_api_integrated/`](batch_highlighter_api_integrated/))
+### Backend Components ([`batch_highlighter_api_integrated/`](../batch_highlighter_api_integrated/))
 
 | Component | Path | Purpose |
 |-----------|------|---------|
-| **Main API** | [`main.py`](batch_highlighter_api_integrated/main.py) | FastAPI application entry point |
-| **Routers** | [`app/routers/`](batch_highlighter_api_integrated/app/routers/) | API endpoints for different operations |
-| **Services** | [`app/services/`](batch_highlighter_api_integrated/app/services/) | Business logic for document processing |
-| **Repositories** | [`app/repositories/`](batch_highlighter_api_integrated/app/repositories/) | Data persistence layer |
-| **Schemas** | [`app/schemas/`](batch_highlighter_api_integrated/app/schemas/) | Pydantic models for request/response |
+| **Main API** | [`main.py`](../batch_highlighter_api_integrated/main.py) | FastAPI application entry point |
+| **Routers** | [`app/routers/`](../batch_highlighter_api_integrated/app/routers/) | API endpoints for different operations |
+| **Services** | [`app/services/`](../batch_highlighter_api_integrated/app/services/) | Business logic for document processing |
+| **Repositories** | [`app/repositories/`](../batch_highlighter_api_integrated/app/repositories/) | Data persistence layer |
+| **Schemas** | [`app/schemas/`](../batch_highlighter_api_integrated/app/schemas/) | Pydantic models for request/response |
 
-### Frontend Components ([`flutter_frontend/`](flutter_frontend/))
+### Frontend Components ([`flutter_frontend/`](../flutter_frontend/))
 
 | Component | Purpose |
 |-----------|---------|
@@ -37,7 +37,7 @@ The Batch Document Highlighter is an asynchronous document processing system tha
 
 ### Step 1: Document Upload
 
-**Endpoint:** [`POST /process/upload`](batch_highlighter_api_integrated/app/routers/process_router.py)
+**Endpoint:** [`POST /process/upload`](../batch_highlighter_api_integrated/app/routers/process_router.py)
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
@@ -67,7 +67,7 @@ The Batch Document Highlighter is an asynchronous document processing system tha
 
 ### Step 2: Job Processing (Async)
 
-**Endpoint:** [`GET /progress/{job_id}`](batch_highlighter_api_integrated/app/routers/progress_router.py)
+**Endpoint:** [`GET /progress/{job_id}`](../batch_highlighter_api_integrated/app/routers/progress_router.py)
 
 The system uses a queue-based architecture for processing:
 
@@ -93,7 +93,7 @@ The system uses a queue-based architecture for processing:
 
 ### Step 3: Document Analysis Engine
 
-**PDF Analysis:** [`pdf_highlighter.py`](batch_highlighter_api_integrated/app/services/pdf_highlighter.py)
+**PDF Analysis:** [`pdf_highlighter.py`](../batch_highlighter_api_integrated/app/services/pdf_highlighter.py)
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
@@ -103,12 +103,12 @@ The system uses a queue-based architecture for processing:
 ```
 
 **Engine Selection:**
-- **Single Column Engine:** [`single_column_engine.py`](batch_highlighter_api_integrated/app/services/single_column_engine.py) - For simple, single-column documents
-- **Multi Column Engine:** [`multi_column_engine.py`](batch_highlighter_api_integrated/app/services/multi_column_engine.py) - For complex multi-column layouts
+- **Single Column Engine:** [`single_column_engine.py`](../batch_highlighter_api_integrated/app/services/single_column_engine.py) - For simple, single-column documents
+- **Multi Column Engine:** [`multi_column_engine.py`](../batch_highlighter_api_integrated/app/services/multi_column_engine.py) - For complex multi-column layouts
 
 ### Step 4: Matching Process
 
-**Excel Matching:** [`docx_highlighter.py`](batch_highlighter_api_integrated/app/services/docx_highlighter.py)
+**Excel Matching:** [`docx_highlighter.py`](../batch_highlighter_api_integrated/app/services/docx_highlighter.py)
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
@@ -126,8 +126,8 @@ The system uses a queue-based architecture for processing:
 ### Step 5: Result Download
 
 **Endpoints:**
-- [`GET /download/pdf/{job_id}`](batch_highlighter_api_integrated/app/routers/download_router.py) - Download highlighted PDF
-- [`GET /download/csv/{job_id}`](batch_highlighter_api_integrated/app/routers/download_router.py) - Download match report
+- [`GET /download/pdf/{job_id}`](../batch_highlighter_api_integrated/app/routers/download_router.py) - Download highlighted PDF
+- [`GET /download/csv/{job_id}`](../batch_highlighter_api_integrated/app/routers/download_router.py) - Download match report
 
 ---
 
@@ -161,7 +161,7 @@ batch_highlighter_api_integrated/
 
 ## API Endpoints Summary
 
-### Process Router ([`process_router.py`](batch_highlighter_api_integrated/app/routers/process_router.py))
+### Process Router ([`process_router.py`](../batch_highlighter_api_integrated/app/routers/process_router.py))
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -169,14 +169,14 @@ batch_highlighter_api_integrated/
 | `POST` | `/process` | Submit job with file paths |
 | `DELETE` | `/process/{job_id}` | Cancel/delete a job |
 
-### Progress Router ([`progress_router.py`](batch_highlighter_api_integrated/app/routers/progress_router.py))
+### Progress Router ([`progress_router.py`](../batch_highlighter_api_integrated/app/routers/progress_router.py))
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/progress/{job_id}` | Get job status and progress % |
 | `GET` | `/progress` | List all jobs |
 
-### Download Router ([`download_router.py`](batch_highlighter_api_integrated/app/routers/download_router.py))
+### Download Router ([`download_router.py`](../batch_highlighter_api_integrated/app/routers/download_router.py))
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -217,7 +217,7 @@ Scripts\clean_memory.bat
 
 ## Error Handling
 
-The system uses standardized error codes defined in [`error_codes.py`](batch_highlighter_api_integrated/app/core/error_codes.py):
+The system uses standardized error codes defined in [`error_codes.py`](../batch_highlighter_api_integrated/app/core/error_codes.py):
 
 | Error Code | Meaning |
 |------------|---------|
@@ -231,7 +231,7 @@ The system uses standardized error codes defined in [`error_codes.py`](batch_hig
 
 ## Frontend Integration
 
-The Flutter frontend uses the [`HighlighterProvider`](flutter_frontend/lib/providers/highlighter_provider.dart) for state management:
+The Flutter frontend uses the [`HighlighterProvider`](../flutter_frontend/lib/providers/highlighter_provider.dart) for state management:
 
 ```dart
 // Workflow in Flutter:
@@ -241,7 +241,7 @@ The Flutter frontend uses the [`HighlighterProvider`](flutter_frontend/lib/provi
 4. Download results when completed
 ```
 
-See [`progress_screen.dart`](flutter_frontend/lib/screens/progress_screen.dart) for the progress tracking UI implementation.
+See [`progress_screen.dart`](../flutter_frontend/lib/screens/progress_screen.dart) for the progress tracking UI implementation.
 
 ---
 
